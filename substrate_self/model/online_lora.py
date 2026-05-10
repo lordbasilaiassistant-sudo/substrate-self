@@ -23,7 +23,7 @@ from typing import Optional
 
 import torch
 
-from substrate_self.core import Substrate
+from substrate_self.core import Substrate, Episode
 from substrate_self.model.tokenizer import CharTokenizer
 from substrate_self.model.transformer import TinyGPT
 from substrate_self.model.lora import (
@@ -36,6 +36,7 @@ from substrate_self.model.lora import (
     lora_modules,
 )
 from substrate_self.model.online import online_update as _online_update_raw
+from substrate_self.model.replay_filters import dedupe_episodes
 
 
 def setup_lora_runtime(
@@ -96,13 +97,50 @@ def sleep_replay_partner(
     replay_passes: int = 3,
     significance_threshold: float = 0.0,
     seed: int = 0,
+    max_replays_per_episode: int = 8,
+    dedupe: bool = True,
+    dedupe_threshold: float = 0.85,
 ) -> dict:
     """Replay only the active partner's episodes; consolidate into the active
     partner's LoRA. If active_partner_id is None or any episode has no
     partner_id (legacy migration path), include those episodes as well —
     we don't want to silently drop legacy data on first sleep after upgrade.
 
-    Returns metrics: total_steps, mean_loss, episodes_replayed, partner_id, skipped.
+    Carlini-defense parameters (arXiv 2202.07646 — memorization scales
+    log-linearly with duplication; sleep replay IS duplication):
+
+      `max_replays_per_episode` — once an episode has been replayed this
+        many times in its lifetime (cumulative across sleep cycles), it
+        is excluded from further replay passes. Default 8: gives the
+        substrate enough exposures to consolidate a turn without driving
+        Carlini-style verbatim memorization. Tunable; bench owns the
+        empirical sweep.
+
+      `dedupe` (bool) — if True, run `dedupe_episodes` BEFORE pairing
+        user/agent turns. Eliminates near-duplicate (role, partner_id)
+        episodes whose content similarity (SequenceMatcher.ratio) >=
+        `dedupe_threshold`. Default 0.85.
+
+      `dedupe_threshold` — see `replay_filters.dedupe_episodes` for the
+        rationale on 0.85.
+
+    Per-replay-pass behavior: before each pass, refilter to drop any
+    episode whose `replay_count` has reached the cap. On each step where
+    we replay a (user, agent) pair, both episodes' `replay_count` are
+    incremented in place on the live substrate.
+
+    Returns metrics:
+      - total_steps: number of gradient steps actually taken
+      - mean_loss: average loss across those steps
+      - episodes_replayed: number of UNIQUE (user, agent) pairs eligible
+        for replay at the start
+      - partner_id: who was active
+      - skipped: episodes filtered out by partner_id / significance
+      - n_deduped: episodes dropped by the dedupe pass (0 if dedupe=False)
+      - n_capped_out: pairs excluded across all passes because at least
+        one side hit `max_replays_per_episode`
+      - max_replay_count_seen: highest replay_count observed on any
+        episode after this run (sanity check the cap is doing its job)
     """
     g = torch.Generator().manual_seed(seed)
     active = _active_partner_id(substrate)
@@ -117,43 +155,96 @@ def sleep_replay_partner(
             return True  # legacy episode — replay (won't happen post-migration)
         return ep_pid == active
 
-    eligible = [ep for ep in substrate.episodic if belongs(ep)]
-    skipped = len(substrate.episodic) - len(eligible)
+    eligible_episodes = [ep for ep in substrate.episodic if belongs(ep)]
+    skipped = len(substrate.episodic) - len(eligible_episodes)
 
-    if not eligible:
+    # Dedupe BEFORE pairing — near-duplicate stealth duplication is what
+    # Carlini's law catches; we want it stripped before turn-pairing
+    # potentially mismatches pairs across the dropped index.
+    n_deduped = 0
+    if dedupe and eligible_episodes:
+        eligible_episodes, n_deduped = dedupe_episodes(
+            eligible_episodes, similarity_threshold=dedupe_threshold,
+        )
+
+    if not eligible_episodes:
         return {
             "total_steps": 0, "mean_loss": 0.0, "episodes_replayed": 0,
             "partner_id": active, "skipped": skipped,
+            "n_deduped": n_deduped, "n_capped_out": 0,
+            "max_replay_count_seen": 0,
         }
 
-    pairs: list[tuple[str, str]] = []
-    last_user: Optional[str] = None
-    for ep in eligible:
+    # Pair consecutive (user, agent) turns, keeping references to the
+    # Episode objects (NOT just text) so we can read+mutate replay_count.
+    pairs: list[tuple[Episode, Episode]] = []
+    last_user: Optional[Episode] = None
+    for ep in eligible_episodes:
         if ep.role == "user":
-            last_user = ep.content
+            last_user = ep
         elif ep.role == "agent" and last_user is not None:
-            pairs.append((last_user, ep.content))
+            pairs.append((last_user, ep))
             last_user = None
 
     if not pairs:
         return {
             "total_steps": 0, "mean_loss": 0.0, "episodes_replayed": 0,
             "partner_id": active, "skipped": skipped,
+            "n_deduped": n_deduped, "n_capped_out": 0,
+            "max_replay_count_seen": 0,
         }
 
+    def _cap_ok(pair: tuple[Episode, Episode]) -> bool:
+        u, a = pair
+        return (u.replay_count < max_replays_per_episode and
+                a.replay_count < max_replays_per_episode)
+
     losses: list[float] = []
+    capped_out_pairs: set[int] = set()  # indices into `pairs` that hit the cap
+
     for _pass in range(replay_passes):
-        order = torch.randperm(len(pairs), generator=g).tolist()
-        for idx in order:
-            u, a = pairs[idx]
-            loss = _online_update_raw(model, optimizer, tokenizer, substrate, u, a, n_steps=1)
+        # Filter BEFORE this pass — once an episode hits the cap, it's
+        # out for the remainder of this and all future passes.
+        pass_pair_indices = [i for i, p in enumerate(pairs) if _cap_ok(p)]
+        # Any pair that's no longer cap_ok is "capped out" — record once.
+        for i, p in enumerate(pairs):
+            if not _cap_ok(p):
+                capped_out_pairs.add(i)
+        if not pass_pair_indices:
+            break  # nothing left to replay — every pair has saturated its cap
+
+        order_local = torch.randperm(len(pass_pair_indices), generator=g).tolist()
+        for k in order_local:
+            idx = pass_pair_indices[k]
+            u_ep, a_ep = pairs[idx]
+            # One last check — a previous step in this same pass might have
+            # pushed an episode to its cap (only matters for pathological
+            # max_replays_per_episode == 1, but be defensive).
+            if not _cap_ok((u_ep, a_ep)):
+                capped_out_pairs.add(idx)
+                continue
+            loss = _online_update_raw(
+                model, optimizer, tokenizer, substrate, u_ep.content, a_ep.content,
+                n_steps=1,
+            )
+            u_ep.replay_count += 1
+            a_ep.replay_count += 1
             losses.append(loss)
+
+    max_replay_count = max(
+        (ep.replay_count for pair in pairs for ep in pair),
+        default=0,
+    )
+
     return {
         "total_steps": len(losses),
         "mean_loss": float(sum(losses) / len(losses)) if losses else 0.0,
         "episodes_replayed": len(pairs),
         "partner_id": active,
         "skipped": skipped,
+        "n_deduped": n_deduped,
+        "n_capped_out": len(capped_out_pairs),
+        "max_replay_count_seen": max_replay_count,
     }
 
 

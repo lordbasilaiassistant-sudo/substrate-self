@@ -1,12 +1,12 @@
 {
   "T1": {
-    "pre_post_cosine": 0.9999999403953552,
+    "pre_post_cosine": 1.0000001192092896,
     "pass": true
   },
   "T2": {
-    "taught_drop": 2.9761239886283875,
-    "control_drop": 0.4829246997833252,
-    "selectivity": 2.4931992888450623,
+    "taught_drop": 2.9590772092342377,
+    "control_drop": 0.47487807273864746,
+    "selectivity": 2.48419913649559,
     "pass": true
   },
   "T5": {

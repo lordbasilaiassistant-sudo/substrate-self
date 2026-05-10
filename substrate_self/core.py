@@ -45,6 +45,12 @@ class Episode(BaseModel):
 
     Wiped at end of sleep. Anything worth keeping must be consolidated
     into self_facts, partners[<id>].facts, memories, or open_threads first.
+
+    `replay_count` tracks how many times this episode has been sleep-replayed
+    in its lifetime. The Carlini-defense replay cap (see
+    `model/replay_filters.py`) reads this to decide whether the episode is
+    still eligible for replay. Defaults to 0; loads with default for any
+    pre-v0.5 episode that didn't carry the field.
     """
 
     timestamp: str = Field(default_factory=_now)
@@ -52,6 +58,7 @@ class Episode(BaseModel):
     content: str
     significance: float = 0.0  # 0 (trivial) to 1 (load-bearing)
     partner_id: Optional[str] = None  # which partner this turn was with
+    replay_count: int = 0  # how many times sleep-replayed (Carlini-defense)
 
 
 class Memory(BaseModel):

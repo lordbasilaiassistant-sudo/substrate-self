@@ -98,6 +98,14 @@ def sleep_replay(
     and the substrate.
 
     Returns metrics: total_steps, mean_loss, episodes_replayed.
+
+    NOTE (v0.5 Carlini-defense): this is the legacy non-LoRA path. It does
+    NOT enforce replay caps or dedupe. The Carlini-defense (replay caps +
+    near-duplicate dropping) lives only in `sleep_replay_partner`
+    (`online_lora.py`) because the LoRA path is the v0.4+ default and the
+    only path used in multi-partner deployments. If you're using this
+    legacy path, you accept the unfiltered duplication risk documented in
+    `notes/research_discretion.md`. Migrate to `sleep_replay_partner`.
     """
     g = torch.Generator().manual_seed(seed)
     eligible = [(i, ep) for i, ep in enumerate(substrate.episodic)

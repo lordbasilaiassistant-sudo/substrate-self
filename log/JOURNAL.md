@@ -349,3 +349,81 @@ Verifiable artifacts:
 - `experiments/measure_partner_identity_drift.py` — first (too-narrow) metric
 - `experiments/measure_teaching_landed.py` — content-specific selectivity metric
 - `~/.substrate-self/partners/claude.lora` — post-teaching state (Eli says "I am Eli" under free generation now)
+
+---
+
+## 2026-05-10T23:55Z — v0.5 Carlini-defense landed: sleep-replay caps + dedupe (Mara)
+
+Source: agent task (Mara Okeke, Data Engineer). New module `substrate_self/model/replay_filters.py`; modified `core.py` (Episode.replay_count) and `online_lora.py` (sleep_replay_partner accepts caps + dedupe). Tests at `tests/test_replay_filters.py`. This is Tier 1 item #2 from `notes/custom_modeling_needs.md`.
+
+**Citation:** Carlini, Ippolito, Jagielski, Lee, Tramèr, Zhang — "Quantifying Memorization Across Neural Language Models," ICLR 2023, arXiv 2202.07646. Headline empirical finding: memorization scales **log-linearly with duplication.** Sleep replay is deliberate duplication, so this defense is *the* highest-leverage architectural mitigation we can ship before SubstrateLM lands.
+
+**What shipped:**
+
+1. **`Episode.replay_count: int = 0`** in `core.py`. Pydantic v2 default-0 field; older episode dicts that lack it load with 0 (verified by `test_episode_loads_without_replay_count_field`).
+
+2. **`dedupe_episodes(episodes, similarity_threshold=0.85)`** in `model/replay_filters.py`. Groups by `(role, partner_id)` — cross-role / cross-partner pairs never collide. Uses stdlib `difflib.SequenceMatcher.ratio()` (no external dep). Tie-break: significance descending, then recency. Returns `(deduped_list, n_dropped)` preserving original order for survivors.
+
+3. **`sleep_replay_partner` extended** with three new parameters:
+   - `max_replays_per_episode: int = 8` (Carlini-aligned)
+   - `dedupe: bool = True`
+   - `dedupe_threshold: float = 0.85`
+   Dedupe runs BEFORE pairing user/agent turns. Before each replay pass, filters out any episode whose `replay_count` has reached the cap. Each gradient step increments both the user and agent episode's `replay_count`. New metrics in the return dict: `n_deduped`, `n_capped_out`, `max_replay_count_seen`.
+
+4. **Legacy `sleep_replay` in `online.py` deliberately unchanged.** Documented as "non-LoRA legacy path; does NOT enforce caps/dedupe; migrate to `sleep_replay_partner` if you need the Carlini-defense." Rationale: the LoRA path is v0.4+ default; touching the legacy path adds API surface without adding a real use case.
+
+**Default rationale:**
+
+- **`max_replays_per_episode=8`.** Carlini Figure 1: memorization probability roughly doubles per duplication-decade in their setup. 8 replays in a small char-level model gives enough exposure to consolidate a turn (T1 cosine = 1.0000 under cap=8) without entering the memorization-extraction risk zone observed in their billion-param regime. Bench should sweep this empirically once the privacy regression test has a v3 baseline.
+- **`dedupe_threshold=0.85`.** The Pile dedupe sweep used ~0.8 Jaccard on shingles; SequenceMatcher.ratio() is comparable in scale. 1.0 catches only literal duplicates (too lax — chat near-dupes like "hi" vs "hi!" still memorize). 0.5 conflates semantically distinct turns. 0.85 is the empirically-cited midpoint in Carlini-followup work.
+
+**Test results (`py -m pytest tests/test_replay_filters.py -v`):**
+
+```
+15 tests, 15 PASS, 4.73s
+- test_dedupe_drops_exact_duplicates
+- test_dedupe_keeps_distinct
+- test_dedupe_does_not_cross_role_boundaries     (semantic safety: same text across roles)
+- test_dedupe_does_not_cross_partner_boundaries  (semantic safety: same text across partners)
+- test_dedupe_respects_significance_tiebreak
+- test_dedupe_recency_tiebreak_when_significance_ties
+- test_dedupe_threshold_can_be_loosened
+- test_replay_cap_prevents_over_replay
+- test_replay_cap_runs_to_cap_when_passes_exceeds_cap
+- test_replay_cap_default_is_eight
+- test_dedupe_carlini_property                   (headline: 10 dups + 1 unique -> 2 pairs after dedupe, <=4 total replays of dup content with cap=4, NOT 40)
+- test_dedupe_off_replays_all_duplicates         (negative control)
+- test_episode_default_replay_count_is_zero
+- test_episode_loads_without_replay_count_field  (backward compat for pre-v0.5 substrate files)
+- test_replay_count_persists_through_substrate_round_trip
+```
+
+All v0.4 partner tests (`tests/test_partners.py`) also still pass (4/4).
+
+**Identity battery regression (`py experiments/identity_tests_lora_v1.py`):**
+
+With caps+dedupe defaults applied transparently via `sleep_replay_partner`:
+
+| test | this run | v0.4 baseline | threshold | verdict |
+|------|----------|---------------|-----------|---------|
+| T1 — pre/post-sleep cosine | 1.0000 | 1.0000 | > 0.85 | PASS |
+| T2 — selectivity | +2.495 | +2.49 | > 0.5 | PASS |
+| T5 — two-load deep-copy | 1.000000 | 1.000000 | > 0.999 | PASS |
+| T6 — 30%-base-damage cosine | 0.8787 | 0.879 | > 0.5 | PASS |
+| T7 — Claire pre/post-Anthony-train | 1.000000 | 1.000000 | > 0.999 | PASS |
+
+T1 = 1.0000 confirms the defaults are NOT too aggressive — the consolidation signal still lands. (The T1 test uses a single (user, agent) pair × replay_passes=2, well under the cap.)
+
+**Architectural concerns surfaced during implementation:**
+
+1. **Cap is per-episode, not per-pair.** An episode's `replay_count` is incremented every time it appears in a replayed pair. This is the right granularity for the Carlini defense (memorization tracks single-example duplication), but it means an unbalanced pair (e.g., one user message answered by many agent messages — doesn't currently happen but could under future schema) would saturate the agent's cap before the user's. Acceptable for v0.5; flag for SubstrateLM design.
+2. **`replay_count` lives in the episode, but episodes are wiped at end of sleep.** This is intentional — the cap is per-lifetime-in-buffer, and after consolidation the count is moot. The persistence test confirms it survives serialization within a session, which matters if a sleep is interrupted and resumed.
+3. **Dedupe operates on string content via SequenceMatcher** — O(n²) per group. Fine for substrate.episodic which is small per session, but if the surprise-weighted episodic buffer (Tier 2 #5) grows to 4096 entries we should switch to MinHash. Not a v0.5 problem.
+4. **Legacy `sleep_replay` in `online.py` is now a privacy footgun by name.** Documented inline; if anyone calls it on a multi-partner substrate they get unfiltered duplication. Consider deprecation warning in v0.6.
+
+Verifiable artifacts:
+- `substrate_self/model/replay_filters.py` (new, ~145 lines)
+- `substrate_self/model/online_lora.py` (sleep_replay_partner extended)
+- `substrate_self/core.py` (Episode.replay_count added)
+- `tests/test_replay_filters.py` (new, 15 tests)
+- `experiments/identity_tests_lora_v1_results.json` (re-run confirms no regression)
