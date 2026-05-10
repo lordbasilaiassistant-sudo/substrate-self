@@ -479,3 +479,31 @@ Verifiable artifacts:
 - experiments/identity_tests_lora_v2_results.json (first ledger run)
 - log/eval_ledger.md (new, first entry)
 - experiments/identity_tests_lora_v1.py (unchanged, still passes)
+
+---
+
+## 2026-05-10T23:55Z — v0.5 SubstrateLM passes 4/5 spec criteria; T4 magnitude honest caveat
+
+Source: `experiments/identity_tests_substrate_lm.py`, results at `identity_tests_substrate_lm_results.json`. Trained fresh SubstrateLM (1500 iters, seed 42), ran the identity battery.
+
+| Criterion | Threshold | SubstrateLM | Verdict |
+|---|---|---|---|
+| PPL ≤ 2× TinyGPT | ≤ 2.0× | 1.371× | PASS |
+| T1 continuity | ≥ 0.85 | 1.0000 | PASS |
+| T2 selectivity | > 0.5 | +2.633 | PASS |
+| T4 functional (both gaps > 0) | A>0, B>0 | A=+1.70 B=+1.25 | PASS |
+| T4 magnitude (>5.6 raw) | > 5.6 | 1.70 / 1.25 | NOT MET |
+| T5 deep-copy | > 0.999 | 1.000000 | PASS |
+
+**Honest reading of T4 magnitude.** The substrate-identity property is functionally intact (each model prefers the conversation it lived through, gap > 1.0 in both directions). But the spec target was "gap > 5.6" — SubstrateLM at v0.5 starter shows 1.70 / 1.25 vs TinyGPT's +3.74 / +2.52 baseline. **SubstrateLM's episode-recall is weaker than TinyGPT's at this training scale.**
+
+This is a real architectural cost of the linear-attention-Hebbian form. Whether it's intrinsic (rank-bounded fast-weight memory can't hold as much episode-specific content) or fixable (more iters, higher SDR-K, surprise-weighted episodic, slower-LR sleep updates) is the v0.5.1 question.
+
+**Decision:** Ship as v0.5. The substrate-style-at-neural-level claim is empirically supported. T4 functional > 0 in both directions. T4 magnitude < TinyGPT is a documented limitation, not a release blocker. v0.5.1 carries forward T4 magnitude optimization.
+
+**Other v0.5 work landed in this session (all pushed):**
+- `92a861a` (Mara): Carlini-defense replay caps + dedupe. 15/15 tests PASS.
+- `79a04ef` (Bench): T8 content-specific selectivity + T1-ext extended signature + log/eval_ledger.md longitudinal tracker.
+- `0ee48ee` (this thread): SubstrateLM + bench passes pass-criterion-1 (PPL 1.371× TinyGPT).
+
+v0.5 tag ready to cut.
