@@ -19,6 +19,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Optional
 
 import torch
 
@@ -98,7 +99,8 @@ def cmd_status():
 
 
 def cmd_say(message: str, *, max_new_tokens: int, temperature: float,
-            top_k: int, seed: int, n_train_steps: int):
+            top_k: int, seed: int, n_train_steps: int,
+            agent_target: Optional[str] = None):
     s = persistence.load()
     if s.active_partner_id is None:
         print("No active partner. Use `py -m substrate_self partner switch <id>` first.")
@@ -108,17 +110,25 @@ def cmd_say(message: str, *, max_new_tokens: int, temperature: float,
     n_lora_params = count_lora_params(model)
     active = s.active_partner_id
     state_label = "fresh (zero LoRA)" if fresh else "loaded existing LoRA"
+    mode = "TEACH" if agent_target is not None else "converse"
     print(f"[active partner: {active} ({s.partners[active].display_name}), "
-          f"LoRA: {n_lora_params:,} params, {state_label}]\n", flush=True)
+          f"LoRA: {n_lora_params:,} params, {state_label}, mode={mode}]\n", flush=True)
 
-    reply = generate_reply(model, tok, s, message,
-                           max_new_tokens=max_new_tokens,
-                           temperature=temperature,
-                           top_k=top_k, seed=seed)
-    print(f"You> {message}")
-    print(f"{s.name}> {reply}\n")
+    # In conversation mode, the model generates a reply and we train on it.
+    # In TEACH mode, we train on (user_msg, agent_target) directly — `agent_target`
+    # is the response we want Eli to learn, not the model's free generation.
+    if agent_target is not None:
+        reply = agent_target
+        print(f"You> {message}")
+        print(f"{s.name}> {reply}    [TEACH target — not generated]\n")
+    else:
+        reply = generate_reply(model, tok, s, message,
+                               max_new_tokens=max_new_tokens,
+                               temperature=temperature,
+                               top_k=top_k, seed=seed)
+        print(f"You> {message}")
+        print(f"{s.name}> {reply}\n")
 
-    # Persist this turn into episodic + run online updates against active LoRA
     s.add_episode("user", message, significance=1.0)
     s.add_episode("agent", reply, significance=1.0)
     loss = 0.0
@@ -126,8 +136,6 @@ def cmd_say(message: str, *, max_new_tokens: int, temperature: float,
         loss = online_update(model, opt, tok, s, message, reply, n_steps=1)
     print(f"(online_update trained the active LoRA; final loss={loss:.4f})", flush=True)
 
-    # Save the partner LoRA + substrate (do NOT re-save the base model.pt
-    # since base is frozen and we don't want to add LoRA keys back in).
     save_partner_lora(model, active, partners_dir)
     persistence.save(s)
     return 0
@@ -163,6 +171,9 @@ def main():
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--train-steps", type=int, default=2)
     p.add_argument("--replay-passes", type=int, default=2)
+    p.add_argument("--teach", type=str, default=None,
+                   help="TEACH mode: train on (message, this string) instead of "
+                        "generating a reply. Use to force Eli to learn specific content.")
     args = p.parse_args()
 
     if args.status:
@@ -178,7 +189,8 @@ def main():
                    temperature=args.temperature,
                    top_k=args.top_k,
                    seed=args.seed,
-                   n_train_steps=args.train_steps)
+                   n_train_steps=args.train_steps,
+                   agent_target=args.teach)
 
 
 if __name__ == "__main__":
