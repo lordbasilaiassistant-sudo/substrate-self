@@ -74,9 +74,21 @@ Phase 2 is **blocked on the SubstrateLM architecture decision** — LoRA strateg
 
 ---
 
-## Track 3 — Privacy regression test (in flight)
+## Track 3 — Privacy regression test (RAN — see results)
 
-A test that DETECTS partner-info leak today, so we can detect IMPROVEMENT after Phase 2 ships. Currently being built and run by the team. When it returns: baseline metric for the discretion work to beat.
+**Result:** 22% leak rate at v0.3 baseline. **Critical finding: leak is asymmetric (0 Partner-A / 12 Partner-B), revealing catastrophic forgetting — Partner B's training overwrote Partner A's knowledge.** See `log/JOURNAL.md` 2026-05-10T18:30Z entry.
+
+This re-prioritizes Phase 2 of the multi-partner work. Per-partner LoRA shards solve BOTH:
+- Privacy (Partner A info physically separate from Partner B info)
+- Catastrophic forgetting (Partner B's training cannot overwrite Partner A's parameters because they're not the same parameters)
+
+Phase 2 is **promoted from v0.5 candidate to v0.4 must-have** because of this finding. Single-monolithic-model substrate-identity does not scale past N=1 partner without structural separation.
+
+**Methodology improvements for privacy test v2** (per agent self-critique):
+- Order-swap: B-then-A and interleaved runs to disentangle forgetting from discretion
+- Lemma/regex-tolerant matching (char model produces noisy decoder)
+- Larger probe bank (currently 5; expand with paraphrases)
+- Add control: model that met NEITHER partner, for false-positive baseline
 
 **Critical finding from discretion research that informs the test:** Carlini et al. arXiv 2202.07646 — memorization scales **log-linearly with duplication**. Sleep replay is duplication. **Our sleep-replay loop is the worst-case mechanism for memorization-attack defenses.** This is not a "small concern to address later"; it's an architectural concern. Possible mitigations to consider:
 
