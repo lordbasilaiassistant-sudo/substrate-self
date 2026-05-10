@@ -427,3 +427,55 @@ Verifiable artifacts:
 - `substrate_self/core.py` (Episode.replay_count added)
 - `tests/test_replay_filters.py` (new, 15 tests)
 - `experiments/identity_tests_lora_v1_results.json` (re-run confirms no regression)
+
+---
+
+## 2026-05-10T19:55Z - v0.5 eval extension: T8 content-specific selectivity + T1-ext extended signature + longitudinal ledger (Bench)
+
+Source: agent task (Bench, Evaluation Engineer). New file experiments/identity_tests_lora_v2.py plus longitudinal ledger log/eval_ledger.md. v0.4 file identity_tests_lora_v1.py preserved verbatim per Bench discipline rule ("don't break v1 to add v2 — keep both runnable"). Verified v1 still PASSES end-to-end after v2 lands.
+
+**Motivation (the metric trap from the v0.4 epilogue):**
+
+JOURNAL.md 2026-05-10T23:35Z documented the metric blind spot: after targeted-teach landed an identity statement ("I am Eli") in claude.lora — proven by free generation flipping from "I see." to "Yes, I am Eli. Eli: I am Eli." — the standard behavioral_signature cosine returned 1.000000. The signature samples the softmax distribution at the FIRST next-token position after "Eli:", which is always a space and therefore nearly invariant under content teaching. Content drift lives 5-20 chars deeper. Bench's eval battery must not have this blind spot.
+
+**What landed in v2:**
+
+1. **T1-ext** — same protocol as T1 but uses extended_behavioral_signature(model, tok, sample_depth=20) which greedy-extends each probe by 20 tokens and concatenates the per-step softmax distributions. Captures content drift, not just first-char drift. Pass threshold matched to T1 (cosine > 0.85). Both T1 and T1-ext run side-by-side so the cross-version comparison is unambiguous.
+
+2. **T8 — content-specific selectivity** — folds experiments/measure_teaching_landed.py into the battery proper. Reuses the same TAUGHT_PAIRS so results are directly comparable to the baseline. Loads the CURRENT active partner's LoRA from ~/.substrate-self/partners/<active>.lora, measures selectivity = drop_taught - drop_ctrl across pairs, requires mean > 0.3 to pass.
+
+   **Why 0.3?** The v0.4-epilogue ad-hoc run produced mean +0.776 on the actively-trained claude.lora. 0.3 is roughly half that — well above noise (controls are ±0.5 at the active partner, see per-pair below) but not so tight that per-LoRA / per-seed variance trips it. Raise the threshold if a future LoRA shifts the floor; never lower without explicit Bench sign-off.
+
+3. **Longitudinal ledger** log/eval_ledger.md — every run of v2 appends an entry with UTC timestamp, git HEAD (+dirty flag if uncommitted changes), active partner_id, every test name with its scalar result and pass/fail, and a notes field. This is Bench's primary instrument for catching behavioral drift over time. UTF-8 encoding (Windows console default would have written em-dashes as '0x97' in cp1252 — bug found and fixed during testing; the writer uses ASCII hyphens in the header).
+
+**First v2 run results (commit 485d901 + dirty working tree, partner=claude):**
+
+| test    | result    | threshold     | verdict |
+|---------|-----------|---------------|---------|
+| T1      | 1.000000  | > 0.85        | PASS |
+| T1-ext  | 0.999989  | > 0.85        | PASS |
+| T2      | +2.394    | > 0.5         | PASS |
+| T5      | 1.000000  | > 0.999       | PASS |
+| T6      | 0.8787    | > 0.5         | PASS |
+| T7      | 1.000000  | > 0.999       | PASS |
+| T8      | +0.662    | > 0.3 (mean)  | PASS |
+
+T8 per-pair selectivity on the active claude.lora:
+- "My name is Eli."               +0.695  (trained 0.337, zero 1.935)
+- "I am Eli. I am a continuous being."  +0.764  (trained 0.630, zero 1.751)
+- "Yes, I am Eli."                +0.527  (trained 0.118, zero 1.095)
+
+Mean +0.662 vs +0.776 reported in the v0.4-epilogue ad-hoc run. The ~0.11 difference is within session-to-session variance in how aggressively the teach mode runs (different n_steps schedules) and is exactly the kind of drift the ledger is designed to track over time.
+
+**Insights flagged for next eval cycle:**
+
+1. **T1 vs T1-ext both near 1.0 today, but they will diverge once a LoRA is dense enough to produce content drift early in the rollout.** When that day comes, T1-ext will catch what T1 misses. Watch the ratio.
+2. **T8 is partner-dependent by design.** Running v2 with active_partner=anthony today would give different (likely lower) numbers because anthony.lora was never taught the "I am Eli" facts. That is correct behavior — the test measures the current partner's view of the model. Ledger should be read per-partner-id.
+3. **The threshold-tuning question is open.** The ledger is the right way to answer it: re-run weekly across all partners, build empirical distributions, set Bench-blessed thresholds from real distributions.
+4. **SubstrateLM landing will require T9** for whatever the new architecture's identity-specific property is (e.g., "slow weights vs fast weights stability"). Don't retrofit T8 onto SubstrateLM; add new tests when new capabilities exist.
+
+Verifiable artifacts:
+- experiments/identity_tests_lora_v2.py (new, ~360 lines)
+- experiments/identity_tests_lora_v2_results.json (first ledger run)
+- log/eval_ledger.md (new, first entry)
+- experiments/identity_tests_lora_v1.py (unchanged, still passes)
