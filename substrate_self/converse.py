@@ -29,6 +29,11 @@ import torch
 from substrate_self import core, persistence
 from substrate_self.model.generate import default_model_dir, load_trained, substrate_prefix
 from substrate_self.model.online import online_update, sleep_replay, save_model_checkpoint
+from substrate_self.model.lora import (
+    inject_lora, freeze_base, lora_parameters, count_lora_params,
+    load_partner_lora, save_partner_lora, save_base_model,
+)
+from substrate_self.model.online_lora import sleep_replay_partner
 
 
 def model_exists(model_dir: Path) -> bool:
@@ -55,11 +60,34 @@ def run_solo(args):
     s = persistence.load()
     s.begin_wake()
     model, tok = load_trained(model_dir)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+
+    # v0.4 LoRA path: per-partner shards keep partner-A info in different
+    # parameters than partner-B info. Solves catastrophic forgetting +
+    # provides structural privacy isolation. Off-switch: --no-lora.
+    use_lora = (not args.no_lora) and (len(s.partners) > 0)
+    partners_dir = model_dir / "partners"
+    lora_runtime: dict = {}
+    if use_lora:
+        n_wraps = inject_lora(model, rank=args.lora_rank, alpha=args.lora_alpha)
+        freeze_base(model)
+        active = s.active_partner_id
+        loaded = False
+        if active is not None:
+            loaded = load_partner_lora(model, active, partners_dir)
+        optimizer = torch.optim.AdamW(list(lora_parameters(model)), lr=args.lr_lora)
+        lora_runtime = {"active": active, "wraps": n_wraps, "loaded": loaded}
+    else:
+        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
 
     print(f"=== Substrate loaded — SOLO runtime (no LLM) ===")
     print(f"Name: {s.name}  Session: #{s.age_sessions}")
     print(f"Model: {model.num_params():,} params  loaded from {model_dir}")
+    if use_lora:
+        n_lora_params = count_lora_params(model)
+        active_label = lora_runtime["active"] or "<none>"
+        loaded_str = "loaded" if lora_runtime["loaded"] else "fresh (zero LoRA)"
+        print(f"LoRA:  rank={args.lora_rank} alpha={args.lora_alpha}  {n_lora_params:,} params  "
+              f"active={active_label}  ({loaded_str})")
     print(f"Memories: {len(s.memories)}  partner_facts: {len(s.partner_facts)}  threads: {len(s.open_threads)}")
     print(f"=== Type 'sleep' to consolidate (replay+wipe), 'quit' to exit without saving ===\n")
 
@@ -77,10 +105,23 @@ def run_solo(args):
                 break
             if user_input.lower() in ("sleep", "consolidate"):
                 print(f"\n(sleeping — replaying episodic into weights, then wiping)")
-                metrics = sleep_replay(model, optimizer, tok, s, replay_passes=3)
-                print(f"  replay: {metrics['episodes_replayed']} pairs, {metrics['total_steps']} grad steps, mean loss {metrics['mean_loss']:.4f}")
+                if use_lora:
+                    metrics = sleep_replay_partner(model, optimizer, tok, s, replay_passes=3)
+                    print(f"  replay (active='{metrics['partner_id']}'): "
+                          f"{metrics['episodes_replayed']} pairs, "
+                          f"{metrics['total_steps']} grad steps, "
+                          f"mean loss {metrics['mean_loss']:.4f}, "
+                          f"skipped {metrics['skipped']} other-partner episodes")
+                else:
+                    metrics = sleep_replay(model, optimizer, tok, s, replay_passes=3)
+                    print(f"  replay: {metrics['episodes_replayed']} pairs, {metrics['total_steps']} grad steps, mean loss {metrics['mean_loss']:.4f}")
                 s.end_sleep(wipe_episodic=True)
-                save_model_checkpoint(model, model_dir)
+                if use_lora:
+                    if s.active_partner_id is not None:
+                        save_partner_lora(model, s.active_partner_id, partners_dir)
+                    save_base_model(model, model_dir / "model.pt")
+                else:
+                    save_model_checkpoint(model, model_dir)
                 persistence.save(s)
                 print(f"(slept — model + substrate saved to {model_dir})")
                 break
@@ -108,7 +149,12 @@ def run_solo(args):
     finally:
         if not args.no_save:
             persistence.save(s)
-            save_model_checkpoint(model, model_dir)
+            if use_lora:
+                if s.active_partner_id is not None:
+                    save_partner_lora(model, s.active_partner_id, partners_dir)
+                save_base_model(model, model_dir / "model.pt")
+            else:
+                save_model_checkpoint(model, model_dir)
             print(f"(substrate + model saved)")
     return 0
 
@@ -166,6 +212,11 @@ def main() -> int:
     parser.add_argument("--temperature", type=float, default=0.85)
     parser.add_argument("--top-k", type=int, default=40)
     parser.add_argument("--no-save", action="store_true")
+    parser.add_argument("--no-lora", action="store_true",
+                        help="Disable per-partner LoRA shards (legacy single-monolithic-model behavior)")
+    parser.add_argument("--lora-rank", type=int, default=4)
+    parser.add_argument("--lora-alpha", type=float, default=8.0)
+    parser.add_argument("--lr-lora", type=float, default=5e-4)
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
     return run_solo(args)
