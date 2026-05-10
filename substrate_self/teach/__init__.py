@@ -17,5 +17,12 @@ speaks with its own learned language faculty.
 """
 
 from substrate_self.teach.corpus import generate_corpus, CorpusExample
+from substrate_self.teach.vision import generate_caption_corpus, VisionExample, caption_image
 
-__all__ = ["generate_corpus", "CorpusExample"]
+__all__ = [
+    "generate_corpus",
+    "CorpusExample",
+    "generate_caption_corpus",
+    "VisionExample",
+    "caption_image",
+]
