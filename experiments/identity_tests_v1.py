@@ -101,14 +101,16 @@ def cosine(a: np.ndarray, b: np.ndarray) -> float:
 
 
 def loss_on_text(model, tok, text: str) -> float:
-    """Cross-entropy loss the model assigns to a piece of text."""
+    """Cross-entropy loss the model assigns to a piece of text.
+    Tensors built on the model's current device (matters when model is on cuda)."""
     ids = tok.encode(text)
     if len(ids) < 2:
         return 0.0
     if len(ids) > model.cfg.block_size + 1:
         ids = ids[-(model.cfg.block_size + 1):]
-    x = torch.tensor(ids[:-1], dtype=torch.long).unsqueeze(0)
-    y = torch.tensor(ids[1:], dtype=torch.long).unsqueeze(0)
+    device = next(model.parameters()).device
+    x = torch.tensor(ids[:-1], dtype=torch.long, device=device).unsqueeze(0)
+    y = torch.tensor(ids[1:], dtype=torch.long, device=device).unsqueeze(0)
     model.eval()
     with torch.no_grad():
         _, loss = model(x, y)

@@ -62,16 +62,20 @@ def generate_text(
     max_new_tokens: int = 200,
     temperature: float = 0.85,
     top_k: int = 40,
+    device: Optional[str] = None,
 ) -> str:
     from substrate_self import persistence
 
     if substrate is None:
         substrate = persistence.load()
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
 
     model, tok = load_trained(model_dir)
+    model = model.to(device)
     prompt = substrate_prefix(substrate, user_input)
     ids = tok.encode(prompt)
-    x = torch.tensor(ids, dtype=torch.long).unsqueeze(0)
+    x = torch.tensor(ids, dtype=torch.long, device=device).unsqueeze(0)
     out = model.generate(
         x,
         max_new_tokens=max_new_tokens,

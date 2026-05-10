@@ -66,8 +66,9 @@ def online_update(
     if len(ids) < 2:
         return 0.0
 
-    x = torch.tensor(ids[:-1], dtype=torch.long).unsqueeze(0)
-    y = torch.tensor(ids[1:], dtype=torch.long).unsqueeze(0)
+    device = next(model.parameters()).device
+    x = torch.tensor(ids[:-1], dtype=torch.long, device=device).unsqueeze(0)
+    y = torch.tensor(ids[1:], dtype=torch.long, device=device).unsqueeze(0)
 
     model.train()
     last_loss = 0.0
