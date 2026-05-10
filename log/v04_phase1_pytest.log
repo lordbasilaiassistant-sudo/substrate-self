@@ -1,0 +1,50 @@
+=== pytest tests/ -v ===
+============================= test session starts =============================
+platform win32 -- Python 3.13.13, pytest-9.0.3, pluggy-1.6.0 -- C:\Users\drlor\AppData\Local\Microsoft\WindowsApps\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\drlor\OneDrive\Desktop\substrate-self
+configfile: pyproject.toml
+plugins: anyio-4.13.0, langsmith-0.7.36, asyncio-1.3.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 4 items
+
+tests/test_partners.py::test_v3_loads_as_v4 PASSED                       [ 25%]
+tests/test_partners.py::test_round_trip PASSED                           [ 50%]
+tests/test_partners.py::test_active_partner_switch PASSED                [ 75%]
+tests/test_partners.py::test_episode_carries_partner PASSED              [100%]
+
+============================== 4 passed in 0.05s ==============================
+=== identity_tests_v1.py ===
+======================================================================
+substrate-self identity tests at language scale
+======================================================================
+
+--- T1: Behavioral continuity across sleep ---
+  T1: pre/post-sleep cosine similarity = 0.9970
+
+--- T2: Online learning teaches new facts (loss-based selectivity) ---
+  T2: taught loss 3.276 -> 0.029 (drop +3.247)
+      control loss 2.763 -> 3.366 (drop -0.603)
+      selectivity (taught_drop - control_drop): +3.849
+
+--- T3/T4: Episode-specific consolidation (two parallel models) ---
+  T3/T4: model_A loss on own=1.261 vs other=4.645 (gap +3.384)  PASS
+         model_B loss on own=1.960 vs other=4.412 (gap +2.452)  PASS
+
+--- T5: Identity transfer (deep copy) ---
+  T5: original vs copy signature cosine = 1.000000 (should be ~1.0)
+
+--- T6: Adversarial damage (30% weights zeroed) ---
+  T6: clean vs 30%-damaged signature cosine = 0.8787
+
+======================================================================
+VERDICT — what the core actually does at this scale:
+======================================================================
+  T1 behavioral continuity                 PASS  (0.9970408082008362)
+  T2 online teaching selectivity           PASS  (3.8493179120123386)
+  T3/T4 episode-specific recall            PASS  ((3.3840155601501465, 2.45193612575531))
+  T5 identity transfer                     PASS  (0.9999999403953552)
+  T6 30% damage tolerance                  PASS  (0.8787117004394531)
+
+  5/5 core properties hold at this scale.
+  Core is validated enough to scale up. Pick scaling axis: model size, corpus size, training time.

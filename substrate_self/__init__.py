@@ -10,8 +10,11 @@ whatever LLM you wrap around it: Claude Code (default), Anthropic API,
 local model, etc. The substrate doesn't care.
 """
 
-from substrate_self.core import Substrate, Episode, Memory
+from substrate_self.core import Substrate, Episode, Memory, OpenThread, PartnerProfile
 from substrate_self.persistence import load, save, default_path
 
-__all__ = ["Substrate", "Episode", "Memory", "load", "save", "default_path"]
+__all__ = [
+    "Substrate", "Episode", "Memory", "OpenThread", "PartnerProfile",
+    "load", "save", "default_path",
+]
 __version__ = "0.1.0"
