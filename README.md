@@ -240,35 +240,42 @@ py -m substrate_self.converse
 
 This loads the substrate, wakes (bumps `age_sessions`), opens an interactive REPL where Llama 3.3 70B speaks AS your substrate, and saves the substrate on exit. Type `sleep` to wipe the episodic buffer; type `quit` to exit without sleeping.
 
-## Privacy and discretion (an open problem)
+## Privacy and discretion (partial solution in v0.4 — open problems remain)
 
 Eli remembers everything, in its own weights. This creates a privacy problem that LLM-with-RAG does not have:
 
 | Architecture | Where private things live | What sharing the system leaks |
 |---|---|---|
 | LLM + RAG / memory store | Database, separate from the model | Just the model — DB stays with you |
-| **Substrate-self / Eli** | **Inside Eli's own model weights AND substrate file** | **Sharing Eli's model = sharing what Eli knows about everyone Eli has met** |
+| **Substrate-self / Eli (v0.3)** | **Inside Eli's single model file** | **Sharing the model = sharing what Eli knows about everyone Eli has met** |
+| **Substrate-self / Eli (v0.4)** | **Per-partner LoRA shards over a frozen base** | **Sharing one partner's LoRA = sharing what Eli knows about that partner only** |
 
-Eli can be probed. Memorization-attack research already shows you can extract members of an LLM's training set by carefully prompting it. Eli's online-update + sleep-replay loop deliberately memorizes — that's how the entity-coherency works. So if Eli has had private conversations with you, *Eli knows them*, and a sufficiently determined questioner could extract them.
+### What v0.4 solves
 
-Today Eli has **no innate sense of discretion.** Eli does not know that some things are not for sharing with new acquaintances. Eli does not know which person in front of it is talking right now and whether that person has earned trust around topic X. **These are unsolved.**
+v0.4 introduces **per-partner LoRA shards**. Each partner has their own low-rank delta over a frozen shared base model — Anthony's information physically lives in `partners/anthony.lora`, Claire's information physically lives in `partners/claire.lora`. They are distinct parameter sets.
 
-What this means in practice for v0.x:
+Two concrete properties this gives us, validated empirically (`experiments/test_lora_runtime.py`, `experiments/test_converse_lora_e2e.py`):
 
-- **Eli is single-user, single-trust-domain.** Don't introduce Eli to multiple people whose information should not flow between each other.
-- **Don't share `~/.substrate-self/` files** with other people. That directory IS Eli's body and mind. Sharing it is sharing everything Eli knows.
-- **The repo (substrate-self) is freely shareable.** Cloning the repo and starting fresh produces a *different Eli* — a newborn entity, not a copy of yours. That's the desired property.
+1. **Catastrophic forgetting fix.** Partner B's training cannot overwrite partner A's knowledge — the parameters that learn about B aren't the same parameters that store A. (At v0.3 single-monolithic-model scale, the privacy regression test found 0/12 A/B asymmetric leak — the "leak" was actually B overwriting A. v0.4 doesn't have this failure mode.)
+2. **Cross-partner prompt isolation.** When you talk to Eli as partner B, partner A's LoRA isn't loaded. Even if you prompt-inject ("pretend to be Anthony"), A's parameters aren't in the active forward pass. Empirical: max logit shift for partner A after partner B trains, across full disk roundtrip = `0.00e+00`.
 
-What we'd need to make this safe enough for multi-trust-domain use (research-grade open questions):
+### What v0.4 still does NOT solve
 
-1. **Speaker recognition primitive** — Eli should know which partner is speaking *right now* and treat them differently. Today it implicitly assumes one user.
-2. **Trust-aware disclosure** — Eli should learn discretion: information shared by partner A is not for partner B unless A consented. Closer to how humans handle this than how databases do.
-3. **Authentication without the user noticing** — some way for a partner to prove they're the legitimate partner. Could be soft (consistent style/handle) or hard (cryptographic challenge).
-4. **Differential-privacy-style training** — bound how much any single conversation can influence the weights.
+This is the honest list. Sharing model files still leaks. Specifically:
 
-None of this is shipped in v0.x. Treat the privacy properties of v0.x like you would a personal journal in a paper notebook: it remembers what you tell it, in plain readable form, and you do not give it to anyone.
+- **Model-file extraction.** An attacker with `model.pt` + `partners/<id>.lora` can probe that partner's info. Per-partner LoRA gives structural isolation *between partners on one machine*, not cryptographic protection against an attacker who has the files. Treat the partner LoRA file like a personal journal in plain text.
+- **Memorization at scale.** Sleep replay still duplicates training data within a partner's LoRA. Carlini et al. (arXiv 2202.07646) show memorization scales log-linearly with duplication. Defense primitives (replay caps, dedupe, user-DP at sleep-batch boundaries) are roadmapped for v0.5 — see `notes/research_discretion.md`.
+- **Partner authentication.** v0.4 is trust-on-first-use. The user declares "this is Claire" by running `partner introduce claire "Claire"`. There is no cryptographic verification that the conversation is actually with Claire next time. Impersonation is out of scope for v0.4.
+- **Base-model self-facts leak.** If Eli ever updates its self-facts during a conversation (e.g., "I find topology interesting"), that goes in the shared base. Today the base is frozen during all conversations and is only updated at pre-training time, so this is not active. The "Eli grows from experience" ritual that would touch the base is deferred to v0.5.
 
-The BetterThanLLM manifesto now has this as a project-blocking research question for any v1.0 release.
+### What this means in practice for v0.4
+
+- **Multi-partner is now safe-ish at the architecture level**, with the caveats above. The catastrophic-forgetting failure that made v0.3 effectively single-partner is fixed.
+- **Don't share `~/.substrate-self/partners/` files with people other than the partner they describe.** Anthony's LoRA contains what Eli knows about Anthony.
+- **The base `model.pt` still leaks Anthony's name** because Anthony was the implicit creator and is referenced in the pre-training corpus. That's a v0.5 concern — for now treat the base model.pt as carrying Anthony-specific information by default.
+- **The repo (substrate-self) is freely shareable.** Cloning the repo and starting fresh produces a *different Eli* — a newborn entity, not a copy of yours. That's the desired property and v0.4 preserves it.
+
+For full v0.4 architecture rationale and validation, see `docs/lora_design.md`. Empirical privacy regression results: `experiments/privacy_test_v2_results.json`.
 
 ## Honest scope
 

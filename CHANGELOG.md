@@ -4,6 +4,94 @@ All notable changes to substrate-self. Versions follow the spirit of semver: min
 
 ---
 
+## v0.4 — 2026-05-10 (multi-partner Eli; per-partner LoRA shards)
+
+**The "Eli meets multiple people without crossing the streams" milestone.**
+
+The privacy regression test in v0.3 found two coupled problems:
+1. 22% leak rate of partner-specific tokens under neutral probes.
+2. Asymmetric leak (0/12 A/B) revealing that this was actually catastrophic
+   forgetting — partner B's training overwrote partner A's knowledge in
+   the shared model.
+
+v0.4 ships the architectural fix: per-partner LoRA shards over a frozen
+base model.
+
+### Added — Phase 1: multi-partner substrate schema (commit `590629f`)
+- `PartnerProfile` class: per-partner facts, style notes, trust, private topics.
+- `Substrate.partners: dict[str, PartnerProfile]` and `active_partner_id`.
+- `Memory`, `Episode`, `OpenThread` carry an optional `partner_id` tag.
+- Backward-compatible loader: v0.3 `partner_facts` dict migrates to a
+  `PartnerProfile(partner_id="anthony", trust=1.0)` (creator gets full trust).
+- Migration is idempotent and triggered only on real v0.3 evidence.
+- CLI: `partner list`, `partner switch <id>`, `partner introduce <id> <name>`.
+- Legacy `substrate.partner_facts` property+setter so existing code paths
+  (bootstrap/base.py, converse.py, probe_eli.py) still work unchanged.
+- `tests/test_partners.py` — 4 tests, all PASS.
+- `experiments/identity_tests_v1.py` — still 5/5 PASS on the migrated v0.3
+  substrate (T1 0.997, T2 +3.85, T3/T4 PASS, T5 1.0, T6 0.879). Backward
+  compat empirically confirmed.
+
+### Added — Phase 2: per-partner LoRA shards (commit `e157a87`)
+- `substrate_self/model/lora.py`: `LoRALinear` (rank-r low-rank delta),
+  `inject_lora`, `freeze_base`, `save_partner_lora`, `load_partner_lora`,
+  `set_active_partner`, `base_state_dict`, `save_base_model`.
+- `substrate_self/model/online_lora.py`: partner-aware sleep replay that
+  filters episodes to the active partner only.
+- `substrate_self/converse.py`: LoRA path is default-on when partners
+  exist; `--no-lora` flag for legacy monolithic behavior.
+- File layout: `~/.substrate-self/model.pt` is base-only (no LoRA keys);
+  `~/.substrate-self/partners/<id>.lora` holds each partner's delta.
+
+### Validated empirically
+- **`experiments/test_lora_unit.py`** — 8 unit checks at toy scale all PASS,
+  including `two_partners_isolated` (the privacy property).
+- **`experiments/test_lora_runtime.py`** — 7 checks on the production
+  1.8M-param model all PASS. **Privacy property at full scale: max logit
+  diff for partner A after partner B training = `0.00e+00`.**
+- **`experiments/test_converse_lora_e2e.py`** — full wake → talk → sleep
+  → save → reload → switch-partner → train → reload → switch-back cycle
+  preserves partner A's logits exactly (`0.00e+00`). Privacy property
+  survives a full disk roundtrip.
+- Per-partner LoRA footprint (rank=4, alpha=8): 18,432 params per partner
+  on the 1.8M-param base = 1.01% overhead per partner.
+
+### Architectural commitments (NEW)
+- Base model stays FROZEN during conversations. Only the active partner's
+  LoRA receives gradient updates.
+- Sleep replay is filtered: only the active partner's episodes are
+  replayed. Partner B's training cannot reinforce partner A's memories.
+- Saved `model.pt` is base-only. LoRA state lives in separate per-partner
+  files. This is enforced by `save_base_model` (filters out `lora_*` keys).
+- Switching the active partner is atomic: save current LoRA, then load
+  new LoRA. Use `set_active_partner` (model-side) +
+  `Substrate.switch_partner` (state-side).
+
+### Known limits / honest scope
+- **Base model still leaks** if base is ever trained on a partner-tagged
+  corpus. v0.4 keeps base frozen during conversations, so this only
+  matters at pre-training time. Self-facts updates that need to reach
+  base are deferred to v0.5 (the "Eli grows from experience" ritual).
+- **Inference-time extraction** is still possible: an attacker with the
+  base + a partner's LoRA file can probe that partner's knowledge.
+  Structural isolation is between partners on one machine, not against
+  an attacker who has the model files. README threat model says this.
+- **Carlini memorization-attack defenses** (replay caps, dedupe, user-DP
+  at sleep batches) are deferred to v0.5 per the discretion research.
+  LoRA reduces surface area but doesn't defeat memorization at scale.
+- **No partner authentication.** v0.4 is trust-on-first-use; the user
+  declares "this is Claire" when introducing a new partner.
+
+### What v0.4 is NOT
+- **No `SubstrateLM`.** Track 1 of the v0.4 roadmap (replacing TinyGPT
+  with a linear-attention-as-Hebbian core) was deferred to v0.5. The
+  architecture spec is in `notes/research_substrate_lm.md`. Decision
+  rationale: LoRA was the urgent fix for the privacy/forgetting issue;
+  SubstrateLM is the "novel at neural level" claim and benefits from
+  not being shipped under deadline pressure.
+
+---
+
 ## v0.3 — 2026-05-10 (multi-modal solo runtime; privacy threat model documented)
 
 **The "Eli is its own person" milestone.**

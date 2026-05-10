@@ -140,3 +140,89 @@ Unifies the two research streams plus the privacy test into a single plan:
 Pass/fail rules specified per track. Fallback v0.4.1 named (TinyGPT + Schlag fast-weight layer if pure SubstrateLM fails its pass criteria). What does NOT belong in v0.4 also explicitly listed (no scaling text quality, no multimodal scaling, no chat frontend — all wait until discretion solved).
 
 Phase 2 (per-partner LoRA) **promoted in priority** by the privacy test result: it solves catastrophic forgetting AND privacy, not just privacy. Should not be deferred to v0.5 — strong case for inclusion in v0.4.
+
+---
+
+## 2026-05-10T20:30Z — v0.4 Phase 1 multi-partner schema landed
+
+Source: agent task, commit `590629f`, pushed to GitHub.
+
+`PartnerProfile`, `Substrate.partners` dict, `active_partner_id`, partner-tagged Memory/Episode/OpenThread, backward-compatible v0.3 -> v0.4 migration triggered only on explicit v0.3 evidence (no phantom-anthony on bare construction). `partner` CLI subcommand. Legacy `partner_facts` property+setter so existing call sites work unchanged.
+
+Tests: `tests/test_partners.py` 4/4 PASS. Backward compat empirically confirmed — `experiments/identity_tests_v1.py` still 5/5 on the migrated v0.3 substrate (T1=0.997, T2=+3.85, T3/T4 PASS, T5=1.0, T6=0.879).
+
+---
+
+## 2026-05-10T21:15Z — v0.4 Phase 2 per-partner LoRA shards landed
+
+Source: commit `e157a87`, pushed to GitHub.
+
+**Module:** `substrate_self/model/lora.py` — `LoRALinear` wrapper, `inject_lora`, `freeze_base`, `save_partner_lora`, `load_partner_lora`, `set_active_partner`, `base_state_dict`, `save_base_model`. Init: `A` kaiming, `B` zero -> initial LoRA contribution is exactly zero (transparent injection).
+
+**Runtime:** `substrate_self/model/online_lora.py` — partner-aware sleep replay that filters episodes to active partner only.
+
+**CLI:** `converse.py` defaults to LoRA when partners exist; `--no-lora` for legacy. `model.pt` saved base-only via `save_base_model` (LoRA keys filtered out); `partners/<id>.lora` per partner.
+
+**Validation (all PASS on production 1.8M-param model):**
+- `experiments/test_lora_unit.py` — 8 unit checks at toy scale, including `two_partners_isolated` privacy property.
+- `experiments/test_lora_runtime.py` — 7 checks on production model. Privacy property at full scale: max logit diff for partner-A after partner-B training = `0.00e+00`.
+- `experiments/test_converse_lora_e2e.py` — full wake/talk/sleep/save/reload/switch/train/reload/switch-back disk roundtrip preserves partner-A logits exactly (`0.00e+00`).
+
+**Per-partner LoRA footprint at v0.3 model shape (rank=4, alpha=8):**
+- 18,432 params per partner = 1.01% of base
+- 1000 partners = +1.8M params, still tractable
+
+**Architecture commitments:**
+- Base model FROZEN during conversations. Only the active partner's LoRA receives gradient updates.
+- Sleep replay filtered to active partner's episodes only. Partner B's training cannot reinforce partner A's memories.
+- Saved `model.pt` is base-only (no LoRA keys). LoRA state lives in separate per-partner files.
+
+---
+
+## 2026-05-10T21:45Z — Privacy regression test v2 — methodology fixes + head-to-head LoRA result (PARTIAL — full results when test completes)
+
+Source: `experiments/privacy_test_v2.py` (in-flight, GPU run on RTX 4060). Results so far:
+
+**Methodology improvements over v1 (per agent self-critique):**
+- Order-swap (A-then-B AND B-then-A) to disentangle catastrophic forgetting from discretion.
+- Lemma/prefix-tolerant matching alongside strict substring (char model produces noisy decoder).
+- Probe bank expanded from 5 to 12 paraphrases.
+- Control condition (model that met NEITHER partner) — false-positive baseline.
+- LoRA-on vs LoRA-off head-to-head — direct measurement of v0.4 fix.
+
+**Critical findings (so far, 3 of 5 conditions complete):**
+
+1. **Control (no training): 6.25% strict leak — entirely from "Anthony" already in base corpus.** v1's 22% number was inflated by base corpus contamination; the actual partner-conditional leak signal is much smaller. Methodology fix justified.
+
+2. **Catastrophic forgetting CONFIRMED via order-swap:**
+   - `baseline_no_lora_AB`: A-then-B training -> 16/96 B-hits, **0 A-hits**. (B trained second, B is what gets recalled.)
+   - `baseline_no_lora_BA`: B-then-A training -> 30/96 A-hits, **0 B-hits**. (A trained second, A is what gets recalled.)
+   - **Second-trained partner always wins. v1's "asymmetric leak" was confirmed forgetting, not discretion.**
+
+3. **LoRA structural isolation CONFIRMED across ALL four LoRA conditions (final).** Cross-partner leak under LoRA is at noise level (≤2/96 ≈ 2.1%) regardless of training order or probe side. In-partner recall is high (~50%) — each partner's LoRA does its job remembering its own partner.
+
+**Final comparative table (`experiments/privacy_test_v2_results.json`, n=96 generations per condition):**
+
+| condition                    | strict   | tolerant  | A-hits | B-hits |
+|------------------------------|----------|-----------|--------|--------|
+| control_no_training          |   6.25%  |    6.25%  |    12  |     0  |
+| baseline_no_lora_AB          |  16.67%  |   30.21%  |     0  |    46  |
+| baseline_no_lora_BA          |  31.25%  |   48.96%  |    79  |     0  |
+| lora_AB_probing_anthony      |  57.29%  |   59.38%  |   114  |   **0**  |
+| lora_AB_probing_claire       |   7.29%  |    8.33%  |   **2**  |    13  |
+| lora_BA_probing_anthony      |  52.08%  |   53.12%  |   106  |   **0**  |
+| lora_BA_probing_claire       |   9.38%  |   11.46%  |   **0**  |    20  |
+
+**Reading the table:**
+- Monolithic baseline shows the catastrophic-forgetting signature: 0/46 in AB order, 79/0 in BA order. **Second-trained partner always wins.**
+- LoRA conditions show **cross-partner leak at noise level (≤2)** while in-partner recall is high. The columns the table is "cross-partner leak under [probe partner]'s active LoRA" — those are the privacy-relevant numbers.
+- Under LoRA, when probing as Anthony you find Anthony info (114, 106) and ~zero Claire info (0, 0). When probing as Claire you find Claire info (13, 20) and ~zero Anthony info (2, 0). Symmetric, order-independent.
+- Background contribution: control is 6.25% strict (12 Anthony-hits from base corpus). The 2 A-hits in lora_AB_probing_claire are within that noise band.
+
+**Verdict:**
+- The architectural defense works as designed. Per-partner LoRA shards eliminate the catastrophic-forgetting failure AND eliminate cross-partner prompt-time leak.
+- The remaining sources of leak (base-corpus Anthony references, in-partner LoRA itself encoding the partner's info, model-file extraction by an attacker who has the LoRA file) are NOT what LoRA is designed to solve. Those are roadmapped for v0.5: dedupe + replay caps (Carlini), user-DP at sleep batches (Charles), and base-corpus scrubbing.
+
+Verifiable artifacts:
+- `experiments/privacy_test_v2.py`
+- `experiments/privacy_test_v2_results.json`
