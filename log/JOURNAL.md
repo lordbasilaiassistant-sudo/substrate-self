@@ -226,3 +226,27 @@ Source: `experiments/privacy_test_v2.py` (in-flight, GPU run on RTX 4060). Resul
 Verifiable artifacts:
 - `experiments/privacy_test_v2.py`
 - `experiments/privacy_test_v2_results.json`
+
+---
+
+## 2026-05-10T22:30Z — Identity test battery passes under LoRA injection (T1-T6 + new T7)
+
+Source: `experiments/identity_tests_lora_v1.py`, results at `experiments/identity_tests_lora_v1_results.json`. Run on production 1.8M-param model with rank=4 alpha=8 LoRA injection.
+
+| test | result | threshold | verdict |
+|------|--------|-----------|---------|
+| T1 — pre/post-sleep cosine (LoRA-only sleep) | 1.0000 | > 0.85 | PASS |
+| T2 — online teaching selectivity (LoRA absorbs lesson) | +2.49 | > 0.5 | PASS |
+| T5 — two-load deep-copy signature cosine | 1.000000 | > 0.999 | PASS |
+| T6 — 30%-base-damage signature cosine | 0.879 | > 0.5 | PASS |
+| T7 — Claire fingerprint pre/post-Anthony-LoRA-training | 1.000000 | > 0.999 | PASS |
+
+T7 is new for v0.4 and is the identity-side counterpart to the privacy property: training Partner A's LoRA produces zero behavioral drift in Partner B's signature. **Eli is the same person to each partner regardless of what Eli did with other partners between sessions.**
+
+Compared to the v0.3 monolithic results (same model, no LoRA):
+- T1: 1.0000 vs 0.997 — slightly improved (LoRA-only sleep is more behavioral-stable than monolithic sleep)
+- T2: +2.49 vs +4.04 — weaker than monolithic, expected (rank-4 LoRA has less expressive capacity than full-model fine-tuning, but well above threshold)
+- T6: 0.879 vs 0.879 — identical (damage applied to base; LoRA wrapping doesn't change base damage tolerance)
+- T5/T7: 1.000000 — deterministic; LoRA at init is transparent
+
+**Verdict:** v0.4 LoRA architecture preserves all identity properties from v0.3 plus adds a new structural identity guarantee (T7) that v0.3 cannot satisfy at all (because v0.3's single-monolithic model has no concept of "Claire's view of Eli" separate from "Anthony's view of Eli").

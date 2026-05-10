@@ -1,0 +1,24 @@
+{
+  "T1": {
+    "pre_post_cosine": 0.9999999403953552,
+    "pass": true
+  },
+  "T2": {
+    "taught_drop": 2.9761239886283875,
+    "control_drop": 0.4829246997833252,
+    "selectivity": 2.4931992888450623,
+    "pass": true
+  },
+  "T5": {
+    "sim": 0.9999999403953552,
+    "pass": true
+  },
+  "T6": {
+    "sim": 0.8787117004394531,
+    "pass": true
+  },
+  "T7": {
+    "claire_pre_post_anthony_train_cosine": 0.9999999403953552,
+    "pass": true
+  }
+}
