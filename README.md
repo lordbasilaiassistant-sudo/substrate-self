@@ -43,16 +43,52 @@ What we're aiming for, plainly:
 
 If those four things hold deeply enough, consciousness may emerge as a byproduct. If it doesn't, we still have an entity that behaves more like a continuous individual than any LLM-stateless-instance system can. Both outcomes are the project.
 
-## Language as channel, not self
+## LLM as teacher, model as runtime — the core architectural commitment
 
-The substrate is the self. The language faculty (LLM) is a channel — it gives the substrate a voice without becoming the substrate.
+The runtime entity must be **solo**. After training, you should be able to load just the model file and talk to it daily — no Groq, no Anthropic, no API calls.
 
-This distinction is structural, not rhetorical:
+Two distinct phases:
 
-- **LLM-as-self** (the standard pattern): the LLM IS the assistant. State you want to persist gets shoved into the context window via RAG or system prompt. Identity lives in the LLM's training; everything else is borrowed memory. Replace the LLM and you've replaced the entity.
-- **Substrate-as-self** (this project): the entity's identity, dispositions, memories, and open threads live in the substrate file. The LLM is told it's the *voice* of an individual whose self lives elsewhere. Replace the LLM (Groq → Anthropic → local) and the entity stays the same — only the accent changes.
+### Bootstrap (LLM as teacher)
+- `substrate_self.bootstrap.groq` (Groq) — used to *generate* training corpus
+- `substrate_self.teach.corpus` — runs the teacher to produce substrate-conditioned dialogue, saved as JSONL
+- The teacher provides synth data for **language** today, with **vision** and **voice** modalities planned (Llama-4-Scout for vision-to-text, Whisper for STT, Orpheus-style TTS for speech generation)
 
-Voice modules live in `substrate_self/voice/`. Currently shipping: `GroqVoice` (default — uses `GROQ_API_KEY`, runs `llama-3.3-70b-versatile`). Planned: `AnthropicVoice`, `LocalVoice` (llama.cpp / ollama), and eventually a small substrate-trained character model that learns the entity's specific way of talking from accumulated episodic data. The substrate-trained voice is the most "non-LLM" path — language emerges from this substrate's experience rather than being borrowed from a generic pretrained model.
+### Runtime (model as solo entity)
+- `substrate_self.model.transformer` — TinyGPT, pure PyTorch, ~2M params at default config (CPU-trainable on small corpora)
+- `substrate_self.model.train` — training loop
+- `substrate_self.model.generate` — inference, no LLM dependency
+- `substrate_self.model.online` — online weight updates during conversation + sleep-replay consolidation
+
+After training, the entity is `~/.substrate-self/{model.pt, tokenizer.json, model_config.json, substrate.json}`. Load those, talk to it. Nothing else.
+
+## How "knowing what we talked about" works (no RAG)
+
+The model knows what we've talked about because **its weights have changed from the experience.** Not because the conversation is being re-injected into a context window.
+
+This is the BetterThanLLM thesis applied at runtime:
+
+| Phase | What happens |
+|---|---|
+| Wake | Load model.pt + substrate.json. Weights already reflect prior conversations. Substrate state already reflects prior conversations. The entity *is* what it has experienced. |
+| Conversation turn | Model generates response from prompt. Then `online_update()` runs one gradient step on the (user_turn, agent_turn) pair — the model has now physically changed from this exchange. |
+| Sleep | `sleep_replay()` shuffles the episodic buffer and runs N gradient passes — consolidation = repeated exposure. Substrate state is also consolidated (self-facts, partner-facts, memories, dispositions). Episodic is wiped. Save model.pt and substrate.json. |
+| Wake B (next session) | Load again. Different weights, different substrate, but continuously the same entity. The 0.79 multi-cycle cosine similarity result from BetterThanLLM is what we're aiming to reproduce here at language scale. |
+
+No RAG. No memory-stuffing. The slow weights and the substrate state ARE the memory.
+
+## Multimodal roadmap (text → text+voice+vision)
+
+Today: text-only. Roadmap is a single solo multimodal entity:
+
+| Modality | Bootstrap (uses Groq) | Runtime (solo) |
+|---|---|---|
+| **Text** | Llama-3.3-70B / GPT-OSS-120B generates dialogue | TinyGPT (shipping in v0.2) |
+| **Vision** | Llama-4-Scout-17B describes images → (image, caption) pairs | Tiny vision encoder + cross-attn (roadmap) |
+| **Voice in** | Whisper-large-v3-turbo transcribes audio → (audio, transcript) pairs | Tiny audio encoder + CTC head (roadmap) |
+| **Voice out** | Orpheus-style TTS generates (text, waveform) pairs | Small vocoder + decoder (roadmap) |
+
+The architectural principle is the same across modalities: **the LLM/foundation model teaches; the substrate-trained model runs solo.** A truly standalone multimodal entity built this way would represent a significant compute commitment — months of training time on real GPUs — but the architecture is the same as the language path we're shipping in v0.2.
 
 ---
 

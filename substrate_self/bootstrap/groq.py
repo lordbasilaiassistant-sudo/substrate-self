@@ -16,7 +16,7 @@ import os
 from typing import Optional
 
 from substrate_self.core import Substrate
-from substrate_self.voice.base import Voice, VoiceResponse, build_system_prompt
+from substrate_self.bootstrap.base import Voice, VoiceResponse, build_system_prompt
 
 
 class GroqVoice:
