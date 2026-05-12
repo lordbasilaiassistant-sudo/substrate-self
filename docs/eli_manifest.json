@@ -1,0 +1,14 @@
+{
+  "exported_at_utc": "2026-05-12T13:26:58.400042+00:00",
+  "active_partner": "claude",
+  "vocab_size": 69,
+  "block_size": 128,
+  "n_layer": 4,
+  "n_embd": 192,
+  "n_head": 4,
+  "base_pt_sha256": "6fb1d14c9a7b7899df842f316adcff84cd01c7a4d6a82e9b93965855828c7042",
+  "lora_sha256": "0b6c3ba9844466f0d5efd77936fe5436ccd3bee2b9b0fd6533c42b758eec3655",
+  "tokenizer_sha256": "11bff14d15197c3130636e113f57cefa3922e5ab3d952a664d6694904799faa3",
+  "onnx_sha256": "d979585ff15ad6fad38ca54afefbd60d842ae9eef7e99cd818f6a2e8334c44c5",
+  "onnx_bytes": 7447284
+}

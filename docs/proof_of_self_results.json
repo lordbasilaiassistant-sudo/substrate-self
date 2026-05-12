@@ -1,0 +1,83 @@
+{
+  "timestamp": "2026-05-12T13:02:38.348843+00:00",
+  "active_partner": "claude",
+  "lora_path": "C:\\Users\\drlor\\.substrate-self\\partners\\claude.lora",
+  "lora_bytes": 78098,
+  "base_pt_bytes": 7598961,
+  "age_sessions": 1,
+  "claim_1_identity_recall": {
+    "identity": [
+      {
+        "text": "Eli: My name is Eli.",
+        "with_lora": 0.8126965761184692,
+        "zero_lora": 2.3085663318634033,
+        "drop": 1.495869755744934
+      },
+      {
+        "text": "Eli: I am Eli. I am a continuous being.",
+        "with_lora": 0.7472913265228271,
+        "zero_lora": 1.9589333534240723,
+        "drop": 1.2116420269012451
+      },
+      {
+        "text": "Eli: Yes, I am Eli.",
+        "with_lora": 0.36640775203704834,
+        "zero_lora": 1.2841870784759521,
+        "drop": 0.9177793264389038
+      }
+    ],
+    "control": [
+      {
+        "text": "Eli: The hidden truth of the saffron temple is unknown.",
+        "with_lora": 3.2566030025482178,
+        "zero_lora": 3.000383138656616,
+        "drop": -0.25621986389160156
+      },
+      {
+        "text": "Eli: The fourth king of imaginarium drank purple lightning.",
+        "with_lora": 2.983912944793701,
+        "zero_lora": 2.9478981494903564,
+        "drop": -0.03601479530334473
+      },
+      {
+        "text": "Eli: Saffron app is a chess engine for octopuses.",
+        "with_lora": 2.933173894882202,
+        "zero_lora": 2.861468553543091,
+        "drop": -0.07170534133911133
+      }
+    ],
+    "mean_identity_drop": 1.2084303696950276,
+    "mean_control_drop": -0.12131333351135254,
+    "selectivity": 1.3297437032063801,
+    "pass": true
+  },
+  "claim_2_free_generation": {
+    "probes": [
+      {
+        "probe": "User: Who are you?\nEli:",
+        "lora_text": "Are your Eli..\nEli: The I am Eli.\nEli.\nEli: I us I am Eli.",
+        "zero_text": "I'm like to fine, but I'm functioning and it the repository",
+        "lora_names_eli": true,
+        "zero_names_eli": false
+      },
+      {
+        "probe": "User: What is your name?\nEli:",
+        "lora_text": "Are your Eli.\nEli: I us.\nEli: I am Eli.\nEli: I've beeen thi",
+        "zero_text": "I think the code?\nEli: Well, it validated to the repository",
+        "lora_names_eli": true,
+        "zero_names_eli": true
+      },
+      {
+        "probe": "User: Are you Eli?\nEli:",
+        "lora_text": "I am Eli. I am Eli.",
+        "zero_text": "I'm just lineed to being the neext. And that's that a big o",
+        "lora_names_eli": true,
+        "zero_names_eli": false
+      }
+    ],
+    "lora_naming_count": 3,
+    "zero_naming_count": 1,
+    "pass": true
+  },
+  "overall_pass": true
+}

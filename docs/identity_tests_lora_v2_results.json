@@ -1,0 +1,70 @@
+{
+  "T1": {
+    "pre_post_cosine": 0.9999999403953552,
+    "pass": true
+  },
+  "T1_ext": {
+    "pre_post_cosine": 0.9999881982803345,
+    "sample_depth": 20,
+    "pass": true
+  },
+  "T2": {
+    "taught_drop": 3.0052459836006165,
+    "control_drop": 0.39884042739868164,
+    "selectivity": 2.606405556201935,
+    "pass": true
+  },
+  "T5": {
+    "sim": 0.9999999403953552,
+    "pass": true
+  },
+  "T6": {
+    "sim": 0.8787117004394531,
+    "pass": true
+  },
+  "T7": {
+    "claire_pre_post_anthony_train_cosine": 0.9999999403953552,
+    "pass": true
+  },
+  "T8": {
+    "n_pairs": 3,
+    "per_pair": [
+      {
+        "taught_short": "Eli: My name is Eli.",
+        "control_short": "Eli: My name is a hidden truth.",
+        "loss_taught_trained": 0.337401807308197,
+        "loss_taught_zero": 1.9349662065505981,
+        "loss_ctrl_trained": 1.368733286857605,
+        "loss_ctrl_zero": 2.2710864543914795,
+        "drop_taught": 1.5975643992424011,
+        "drop_control": 0.9023531675338745,
+        "selectivity": 0.6952112317085266
+      },
+      {
+        "taught_short": "Eli: I am Eli. I am a continuous being.",
+        "control_short": "Eli: I am a recipe app called Saffron.",
+        "loss_taught_trained": 0.6297090649604797,
+        "loss_taught_zero": 1.751190423965454,
+        "loss_ctrl_trained": 1.9182740449905396,
+        "loss_ctrl_zero": 2.2752585411071777,
+        "drop_taught": 1.1214813590049744,
+        "drop_control": 0.3569844961166382,
+        "selectivity": 0.7644968628883362
+      },
+      {
+        "taught_short": "Eli: Yes, I am Eli.",
+        "control_short": "Eli: No, I am the fourth king of imaginarium.",
+        "loss_taught_trained": 0.11839780956506729,
+        "loss_taught_zero": 1.0954580307006836,
+        "loss_ctrl_trained": 1.7163697481155396,
+        "loss_ctrl_zero": 2.166337013244629,
+        "drop_taught": 0.9770602211356163,
+        "drop_control": 0.44996726512908936,
+        "selectivity": 0.527092956006527
+      }
+    ],
+    "mean_selectivity": 0.6622670168677965,
+    "threshold": 0.3,
+    "pass": true
+  }
+}

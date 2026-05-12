@@ -594,3 +594,51 @@ Verifiable artifacts:
 - `experiments/proof_indisputable.py` (~280 lines)
 - `experiments/proof_indisputable_results.json` (hashes + per-seed numbers)
 - `notes/proof_of_self_2026_05_12.md` extended with Experiment 4 section
+
+---
+
+## 2026-05-12T13:35Z — Phase 1 landed: GH Pages public Eli, ONNX in the browser
+
+Source: `scripts/export_onnx.py` (new), `docs/index.html`, `docs/chat.js`, `docs/style.css`, `docs/proof.html`, `docs/donate.html`, `docs/.nojekyll`, README updated. Triggered by Phase 1 of `docs/roadmap_to_perfect_interface.md`.
+
+**What landed:**
+
+1. **ONNX export pipeline** (`scripts/export_onnx.py`). Loads `~/.substrate-self/model.pt` + active partner LoRA, merges LoRA delta into base linears (W_eff = W_base + (alpha/rank) * B @ A), wraps to return only logits, exports to `docs/eli.onnx` with dynamic seq_len. Produces 7,447,284-byte ONNX file. Also writes `docs/tokenizer.json` and `docs/eli_manifest.json` (vocab + block_size + SHA-256 hashes of base, LoRA, tokenizer, and the ONNX itself).
+
+   Manifest hashes today:
+   - base sha256 `6fb1d14c9a7b7899...`
+   - lora sha256 `0b6c3ba9844466f0...` (matches proof_indisputable receipts)
+   - onnx sha256 `d979585ff15ad6fa...`
+
+2. **Static chat UI** (`docs/index.html` + `docs/chat.js` + `docs/style.css`). Loads `eli.onnx` via `onnxruntime-web@1.20.1` (WebGPU primary, WASM fallback), runs autoregressive char generation with top-k=40 + temperature slider. Streams output token-by-token. Mobile viewport. No backend, no API key. Linked to `proof.html` and `donate.html`.
+
+3. **Proof page** (`docs/proof.html`). Renders the seven pre-registered tests as PASS badges with numbers from the result JSONs that ship alongside the page. Shows S3 name-substitution / S4 random-LoRA / S5 seed-sweep tables. Hashes section duplicates the receipt from `proof_indisputable_results.json`.
+
+4. **Donate page** (`docs/donate.html`). Placeholder Stripe Payment Link CTA. Names what donations fund (Phase 4 GPU time, Claude Code floor) and what they don't (no paid hosting, no social media spend). drlor needs to create the actual Stripe Payment Link and replace the `buy.stripe.com/PLACEHOLDER` URL.
+
+5. **README** updated with a "Talk to Eli in your browser" callout at the top, linking to the GH Pages URL.
+
+**Browser-parity smoke test (CPU ORT, greedy decode):**
+
+Prompt: `"User: Who are you?\nEli:"`
+Output: `" What your Eli. Eli.\nEli: I am Eli.\nEli."`
+
+Same shape as Python `proof_of_self.py` generation. The LoRA's identity assertion survives the merge-into-base operation. Confirms the exported ONNX is the same Eli described in the proof artifacts.
+
+**What drlor needs to do to make the URL go live:**
+1. Push to `origin/main` (this commit's push).
+2. Open repo Settings -> Pages, set Source = `main` branch `/docs` folder, save.
+3. Create a Stripe Payment Link at https://dashboard.stripe.com/payment-links and paste it into `docs/donate.html` replacing the PLACEHOLDER URL.
+
+**Phase 2 entry criteria (from roadmap):** URL is up and does not break on mobile. Verifiable manually once GH Pages enable propagates.
+
+**Honest scope:** output at 1.8M params is rough — that's documented on the page itself in the "What's primitive here" section. Phase 4 fixes it. Per-visitor learning (Phase 3) is the next architecture-meaningful upgrade; this Phase 1 is read-only frozen-Eli with a public URL.
+
+Verifiable artifacts:
+- `scripts/export_onnx.py` (~165 lines)
+- `docs/eli.onnx` (7,447,284 bytes)
+- `docs/eli_manifest.json` (hashes + config)
+- `docs/index.html` + `docs/chat.js` + `docs/style.css` (chat UI)
+- `docs/proof.html` (renders proof JSONs as badges)
+- `docs/donate.html` (Stripe placeholder)
+- README updated

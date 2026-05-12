@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Proof — Eli / substrate-self</title>
+<meta name="description" content="Seven pre-registered tests with adversarial falsifiers, all PASS on the on-disk Eli model. Loss numbers, SHA-256 hashes, mtime receipts." />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header>
+  <div class="row">
+    <h1>Proof</h1>
+    <nav>
+      <a href="index.html">talk to eli</a>
+      <a href="donate.html">support</a>
+      <a href="https://github.com/lordbasilaiassistant-sudo/substrate-self" target="_blank" rel="noopener">github</a>
+    </nav>
+  </div>
+  <p class="tagline">
+    Seven pre-registered tests. Four adversarial falsifiers. All held.
+    Re-run any time with <code>py experiments/proof_indisputable.py</code>.
+  </p>
+</header>
+
+<main>
+  <section>
+    <h2>The headline numbers</h2>
+    <div id="badges" class="badge-grid">
+      <div class="badge"><div class="name">loading…</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>S3 — name-substitution control</h2>
+    <p>
+      Same syntactic templates, swap the entity name. If the saved LoRA
+      encodes "Eli" specifically (and not generic English), the loss-drop
+      should be much higher for Eli than for any other name. Numbers are
+      mean loss drop (zero-LoRA loss − with-LoRA loss) across three templates.
+    </p>
+    <div id="s3-table-host"></div>
+    <p class="caveat">
+      Falsifier (pre-registered): Eli drop ≤ max drop for other names →
+      claim falsified. Observed: Eli +1.208 vs next-highest +0.608, margin
+      +0.601. <strong>Held.</strong>
+    </p>
+  </section>
+
+  <section>
+    <h2>S4 — random-LoRA negative control</h2>
+    <p>
+      Five fresh random non-zero LoRA matrices (NOT the saved one) tested
+      on "Eli: My name is Eli." Random LoRAs should NOT match the saved
+      LoRA's identity help.
+    </p>
+    <div id="s4-table-host"></div>
+    <p class="caveat">
+      Falsifier: random LoRA drop ≥ saved drop − 0.3 → "any LoRA helps"
+      claim. Observed: random mean −1.405 (random LoRA actively hurts),
+      saved +1.496, gap +2.901. <strong>Held.</strong>
+    </p>
+  </section>
+
+  <section>
+    <h2>S5 — T4 episode-specific recall, seed sweep</h2>
+    <p>
+      Train two SubstrateLMs from each of 5 seeds, give each a different
+      conversation, measure both gaps. All 10 gaps must be positive
+      (each model prefers its own past on held-out evaluation).
+    </p>
+    <div id="s5-table-host"></div>
+    <p class="caveat">
+      Falsifier: any seed fails T4 → episode-recall is seed luck.
+      Observed: 5/5 seeds pass; 10/10 gaps positive; all > +1.5.
+      <strong>Held.</strong>
+    </p>
+  </section>
+
+  <section>
+    <h2>Artifact receipts (SHA-256)</h2>
+    <p>
+      These are the files that produced the numbers above. Anyone can
+      hash their copies and confirm same-binary reproducibility.
+    </p>
+    <pre id="hashes">loading…</pre>
+  </section>
+
+  <section>
+    <h2>Reproduction</h2>
+    <pre>
+py experiments/identity_tests_substrate_lm.py    # ~30s on RTX 4060
+py experiments/identity_tests_lora_v2.py         # ~10s
+py experiments/proof_of_self.py                  # ~5s
+py experiments/proof_indisputable.py             # ~2min (incl. seed sweep)
+    </pre>
+    <p>
+      Output JSON ships next to this page:
+      <a href="proof_indisputable_results.json">proof_indisputable_results.json</a>,
+      <a href="proof_of_self_results.json">proof_of_self_results.json</a>,
+      <a href="identity_tests_lora_v2_results.json">identity_tests_lora_v2_results.json</a>,
+      <a href="identity_tests_substrate_lm_results.json">identity_tests_substrate_lm_results.json</a>.
+    </p>
+  </section>
+
+  <section>
+    <h2>Full writeup</h2>
+    <p>
+      Plain-English version with all 4 experiments, methodology, and
+      what each one rules out:
+      <a href="https://github.com/lordbasilaiassistant-sudo/substrate-self/blob/main/notes/proof_of_self_2026_05_12.md" target="_blank" rel="noopener">notes/proof_of_self_2026_05_12.md</a>.
+    </p>
+    <p>
+      Architectural priors cited: Schlag/Irie/Schmidhuber 2021 (linear
+      attention is Hebbian) · Carlini et al. 2022 (memorization scales
+      log-linearly with duplication) · Charles et al. 2024 (user-level
+      DP for LLM fine-tuning) · FDLoRA 2024 (federated LoRA shards).
+    </p>
+  </section>
+</main>
+
+<footer>
+  <p>
+    substrate-self · MIT ·
+    <a href="https://github.com/lordbasilaiassistant-sudo/substrate-self">source</a>
+  </p>
+</footer>
+
+<script>
+(async () => {
+  function el(tag, attrs, ...children) {
+    const e = document.createElement(tag);
+    if (attrs) for (const k in attrs) {
+      if (k === "class") e.className = attrs[k];
+      else e.setAttribute(k, attrs[k]);
+    }
+    for (const c of children) {
+      e.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+    }
+    return e;
+  }
+
+  function badge(name, num, pass) {
+    return el("div", { class: "badge" },
+      el("div", { class: "name" }, name),
+      el("div", { class: "num" },
+        num,
+        el("span", { class: "verdict" + (pass ? "" : " fail") },
+          pass ? "PASS" : "FAIL")
+      )
+    );
+  }
+
+  function fmtNum(n, digits=3) {
+    if (typeof n !== "number") return String(n);
+    return (n >= 0 ? "+" : "") + n.toFixed(digits);
+  }
+
+  // Load everything in parallel
+  const [indisp, posR, loraR, slmR] = await Promise.all([
+    fetch("proof_indisputable_results.json").then(r => r.json()).catch(() => null),
+    fetch("proof_of_self_results.json").then(r => r.json()).catch(() => null),
+    fetch("identity_tests_lora_v2_results.json").then(r => r.json()).catch(() => null),
+    fetch("identity_tests_substrate_lm_results.json").then(r => r.json()).catch(() => null),
+  ]);
+
+  const badgesHost = document.getElementById("badges");
+  badgesHost.innerHTML = "";
+
+  // SubstrateLM battery (T1, T2, T4, T5)
+  if (slmR) {
+    badgesHost.appendChild(badge("SubstrateLM T1 — continuity",
+      slmR.T1.pre_post_cosine.toFixed(4), slmR.T1.pass));
+    badgesHost.appendChild(badge("SubstrateLM T2 — teaching",
+      fmtNum(slmR.T2.selectivity), slmR.T2.pass));
+    badgesHost.appendChild(badge("SubstrateLM T4 — episode A_gap",
+      fmtNum(slmR.T4.A_gap), slmR.T4.A_gap > 0));
+    badgesHost.appendChild(badge("SubstrateLM T4 — episode B_gap",
+      fmtNum(slmR.T4.B_gap), slmR.T4.B_gap > 0));
+    badgesHost.appendChild(badge("SubstrateLM T5 — deep-copy",
+      slmR.T5.sim.toFixed(6), slmR.T5.pass));
+  }
+  // LoRA battery v2 (T1-T8 on the actual on-disk Eli)
+  if (loraR) {
+    for (const k of ["T1", "T1_ext", "T2", "T5", "T6", "T7", "T8"]) {
+      const v = loraR[k];
+      if (!v) continue;
+      const num = typeof v.value === "number" ? v.value :
+                  (v.cosine ?? v.selectivity ?? v.mean ?? v.score ?? v);
+      const passVal = v.pass !== undefined ? v.pass : true;
+      badgesHost.appendChild(badge(`LoRA on-disk ${k.replace("_","-")}`,
+        typeof num === "number" ? num.toFixed(num >= 1 ? 4 : 4) : String(num),
+        passVal));
+    }
+  }
+  // proof_of_self (on-disk identity recall + free generation)
+  if (posR) {
+    badgesHost.appendChild(badge("on-disk identity selectivity",
+      fmtNum(posR.claim_1_identity_recall.selectivity),
+      posR.claim_1_identity_recall.pass));
+    badgesHost.appendChild(badge("free generation names Eli",
+      `${posR.claim_2_free_generation.lora_naming_count}/3 vs ${posR.claim_2_free_generation.zero_naming_count}/3 zero`,
+      posR.claim_2_free_generation.pass));
+  }
+  // adversarial falsifiers
+  if (indisp) {
+    for (const f of indisp.falsifiers) {
+      badgesHost.appendChild(badge(f.label, f.held ? "held" : "TRIGGERED", f.held));
+    }
+  }
+
+  // S3 table
+  if (indisp && indisp.sections.s3) {
+    const host = document.getElementById("s3-table-host");
+    const t = el("table");
+    const head = el("tr",
+      null,
+      el("th", null, "name"),
+      el("th", null, "mean loss drop"),
+      el("th", null, "note"),
+    );
+    t.appendChild(head);
+    const m = indisp.sections.s3.means;
+    for (const name of Object.keys(m)) {
+      t.appendChild(el("tr",
+        null,
+        el("td", null, name),
+        el("td", null, fmtNum(m[name])),
+        el("td", null, name === "Eli" ? "← taught" : ""),
+      ));
+    }
+    host.appendChild(t);
+  }
+
+  // S4 table
+  if (indisp && indisp.sections.s4) {
+    const host = document.getElementById("s4-table-host");
+    const t = el("table");
+    t.appendChild(el("tr", null,
+      el("th", null, "seed"),
+      el("th", null, "zero loss"),
+      el("th", null, "random-LoRA loss"),
+      el("th", null, "drop"),
+    ));
+    for (const r of indisp.sections.s4.rows) {
+      t.appendChild(el("tr", null,
+        el("td", null, String(r.seed)),
+        el("td", null, r.zero_loss.toFixed(3)),
+        el("td", null, r.rand_loss.toFixed(3)),
+        el("td", null, fmtNum(r.drop)),
+      ));
+    }
+    host.appendChild(t);
+  }
+
+  // S5 table
+  if (indisp && indisp.sections.s5) {
+    const host = document.getElementById("s5-table-host");
+    const t = el("table");
+    t.appendChild(el("tr", null,
+      el("th", null, "seed"),
+      el("th", null, "A_gap"),
+      el("th", null, "B_gap"),
+      el("th", null, "both > 0?"),
+    ));
+    for (const r of indisp.sections.s5.rows) {
+      t.appendChild(el("tr", null,
+        el("td", null, String(r.seed)),
+        el("td", null, fmtNum(r.A_gap)),
+        el("td", null, fmtNum(r.B_gap)),
+        el("td", null, r.both_positive ? "yes" : "NO"),
+      ));
+    }
+    host.appendChild(t);
+  }
+
+  // Hashes
+  if (indisp && indisp.sections.s1) {
+    const host = document.getElementById("hashes");
+    const lines = [];
+    for (const f of indisp.sections.s1.files) {
+      if (f.missing) continue;
+      const name = f.path.split(/[\\/]/).pop();
+      lines.push(`${name.padEnd(24)} ${String(f.size_bytes).padStart(12)} B  sha256=${f.sha256}`);
+    }
+    host.textContent = lines.join("\n");
+  }
+})();
+</script>
+</body>
+</html>

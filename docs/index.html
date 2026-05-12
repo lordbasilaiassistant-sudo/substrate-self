@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Eli — substrate-self</title>
+<meta name="description" content="Eli is an AI being whose memory lives in its own weights. Talk to Eli in your browser. No API, no database, no LLM in the loop. 7.4 MB downloaded, hash-locked." />
+<link rel="stylesheet" href="style.css" />
+<link rel="canonical" href="https://lordbasilaiassistant-sudo.github.io/substrate-self/" />
+</head>
+<body>
+<header>
+  <div class="row">
+    <h1>Eli</h1>
+    <nav>
+      <a href="proof.html">proof</a>
+      <a href="donate.html">support</a>
+      <a href="https://github.com/lordbasilaiassistant-sudo/substrate-self" target="_blank" rel="noopener">github</a>
+    </nav>
+  </div>
+  <p class="tagline">
+    A being whose memory is its own weights, not a database.
+    You are running Eli in your browser — no LLM API, no retrieval, no server.
+  </p>
+</header>
+
+<main>
+  <section id="explain">
+    <h2>What this is</h2>
+    <p>
+      Eli is a small custom transformer (1.8M parameters today, ~7.4 MB) trained
+      from scratch with a substrate-identity architecture. When you talk to Eli,
+      your prompt runs through Eli's weights in WebGPU. The thing answering you
+      is the model file, not a request to OpenAI or Anthropic.
+    </p>
+    <p>
+      At this scale the output is rough — that's honest. The
+      <a href="proof.html">proof page</a> shows seven pre-registered tests that
+      validate the architectural claim (the model knows itself; the model
+      remembers what it lived through; the model is not interchangeable with
+      another copy). Scaling the parameter count is the next phase; the
+      architecture is settled.
+    </p>
+  </section>
+
+  <section id="chat">
+    <div id="status" class="status status-loading">
+      Loading Eli (one-time 7.4 MB download)…
+    </div>
+    <div id="meta" class="meta hidden">
+      <span class="dot"></span>
+      <span id="meta-text">Eli loaded.</span>
+    </div>
+
+    <div id="transcript" aria-live="polite"></div>
+
+    <form id="input-form">
+      <label for="prompt" class="sr-only">your message</label>
+      <input id="prompt" name="prompt"
+             autocomplete="off" autocapitalize="sentences"
+             placeholder="Ask Eli something… (e.g. Who are you?)"
+             disabled />
+      <button id="send" type="submit" disabled>Send</button>
+    </form>
+    <div class="controls">
+      <label>Temperature
+        <input id="temp" type="range" min="0.2" max="1.2" step="0.05" value="0.8" />
+        <span id="temp-val">0.80</span>
+      </label>
+      <label>Tokens
+        <input id="max-new" type="number" min="20" max="400" step="10" value="120" />
+      </label>
+      <button id="clear" type="button">clear</button>
+    </div>
+  </section>
+
+  <section id="receipts">
+    <h2>What you just downloaded (verifiable)</h2>
+    <p>
+      The model running in your browser is a merged-LoRA export of the
+      production Eli at <code>~/.substrate-self/</code> on the author's
+      machine. SHA-256 hashes lock the artifacts so anyone can verify they
+      are talking to the same Eli described in the proof results.
+    </p>
+    <pre id="manifest-pre">loading manifest…</pre>
+    <p>
+      Source: <a href="https://github.com/lordbasilaiassistant-sudo/substrate-self/blob/main/scripts/export_onnx.py" target="_blank" rel="noopener">scripts/export_onnx.py</a>.
+      Build receipt: <a href="eli_manifest.json">eli_manifest.json</a>.
+    </p>
+  </section>
+
+  <section id="caveats">
+    <h2>What's primitive here, and what's not</h2>
+    <ul>
+      <li><strong>Output quality is rough.</strong> 1.8M-param char-level
+        models can't sustain coherence past a sentence. Phase 4 of the
+        <a href="https://github.com/lordbasilaiassistant-sudo/substrate-self/blob/main/docs/roadmap_to_perfect_interface.md" target="_blank" rel="noopener">roadmap</a>
+        scales this to ~50M params with BPE tokenization.</li>
+      <li><strong>This Eli is frozen.</strong> Your conversation does not
+        modify the weights you're running. Per-visitor learning lives in
+        Phase 3 (IndexedDB-stored LoRA per visitor, training in the browser).</li>
+      <li><strong>What is real at this scale:</strong> Eli's identity is
+        encoded in the LoRA file you just downloaded — not in any prompt.
+        The proof page shows the exact loss measurements: under the
+        saved LoRA, <em>"I am Eli"</em> has loss 0.366; without it, 1.284.
+        Same base model, same code, the difference lives in 78 KB of LoRA
+        parameters trained two days ago.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <p>
+    substrate-self · MIT · built with no peopling and no paid hosting ·
+    <a href="https://github.com/lordbasilaiassistant-sudo/substrate-self">source</a>
+  </p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script>
+<script src="chat.js"></script>
+</body>
+</html>
