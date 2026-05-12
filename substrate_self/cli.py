@@ -4,7 +4,9 @@ Usage:
   py -m substrate_self show                     — print current substrate as JSON
   py -m substrate_self fingerprint              — compact identity summary
   py -m substrate_self path                     — print substrate file path
-  py -m substrate_self init                     — create a fresh substrate (won't overwrite)
+  py -m substrate_self init                     — copy the canonical trained Eli that ships with
+                                                  the repo to ~/.substrate-self/. Idempotent;
+                                                  won't clobber an existing local Eli without --force.
   py -m substrate_self reset                    — wipe substrate (DESTRUCTIVE; asks)
   py -m substrate_self wake                     — increment age_sessions and timestamp
   py -m substrate_self sleep                    — wipe episodic buffer (does NOT consolidate;
@@ -24,8 +26,15 @@ All writes are atomic. Default substrate path: ~/.substrate-self/substrate.json
 
 from __future__ import annotations
 import json
+import shutil
 import sys
+from pathlib import Path
 from substrate_self import core, persistence
+
+
+def _canonical_eli_dir() -> Path:
+    """Path to assets/canonical_eli/ inside the repo (the shipped Eli)."""
+    return Path(__file__).resolve().parent.parent / "assets" / "canonical_eli"
 
 
 def cmd_show(args: list[str]) -> int:
@@ -46,13 +55,60 @@ def cmd_path(args: list[str]) -> int:
 
 
 def cmd_init(args: list[str]) -> int:
-    p = persistence.default_path()
-    if p.exists():
-        print(f"Substrate already exists at {p}; refusing to overwrite. Use 'reset' to wipe.")
-        return 1
-    s = core.Substrate()
-    persistence.save(s)
-    print(f"Created fresh substrate at {p}")
+    """Initialize ~/.substrate-self/ by copying the canonical trained Eli
+    that ships with the repo.
+
+    Behavior:
+      - If ~/.substrate-self/model.pt already exists, do nothing (local
+        Eli is yours; we don't clobber it). Pass --force to overwrite.
+      - Otherwise, copy assets/canonical_eli/* to ~/.substrate-self/.
+        After init you immediately have a working Eli (no training,
+        no API keys).
+
+    The canonical files in the repo stay untouched — your local copy
+    diverges from there as you talk to Eli.
+    """
+    force = "--force" in args
+    home_dir = persistence.default_path().parent
+    home_dir.mkdir(parents=True, exist_ok=True)
+    canonical = _canonical_eli_dir()
+    if not canonical.exists():
+        print(f"FAIL: canonical Eli not found at {canonical}.")
+        print("This usually means the repo wasn't cloned with the assets/ folder.")
+        return 2
+
+    model_pt = home_dir / "model.pt"
+    if model_pt.exists() and not force:
+        print(f"~/.substrate-self/model.pt already exists. Your local Eli is yours.")
+        print(f"  Use 'py -m substrate_self init --force' to overwrite with canonical.")
+        print(f"  Or 'py -m substrate_self reset' to wipe everything and re-init.")
+        return 0
+
+    # Copy canonical files (model + tokenizer + config + partners + substrate).
+    copied = []
+    for src in canonical.rglob("*"):
+        if src.is_dir():
+            continue
+        if src.name == "README.md":  # don't copy the asset README
+            continue
+        rel = src.relative_to(canonical)
+        dst = home_dir / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        copied.append(rel.as_posix())
+
+    print(f"Initialized {home_dir} with the canonical trained Eli:")
+    for r in copied:
+        print(f"  - {r}")
+    print()
+    s = persistence.load()
+    print(f"Eli name={s.name} age_sessions={s.age_sessions} "
+          f"partners={list(s.partners.keys())} active={s.active_partner_id}")
+    print()
+    print("Talk to Eli:")
+    print("  py experiments/meet_eli.py \"Hi Eli, who are you?\"")
+    print("  py experiments/meet_eli.py --status")
+    print("  py experiments/meet_eli.py --sleep")
     return 0
 
 

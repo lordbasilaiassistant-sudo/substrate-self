@@ -33,6 +33,8 @@ htmlcov/
 # Substrate files — never commit personal substrate state
 *.substrate.json
 substrate.json
+# Exception: the canonical Eli's starter substrate ships with the repo.
+!assets/canonical_eli/substrate.json
 
 # Secrets — never commit
 .env

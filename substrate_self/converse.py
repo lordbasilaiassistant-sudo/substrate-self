@@ -1,22 +1,28 @@
-"""End-to-end interactive loop.
+"""Interactive REPL for talking to Eli. SOLO runtime only — no LLM in
+the loop, ever.
 
-Two modes:
+Usage:
+  py -m substrate_self.converse
 
-  1. SOLO (default — uses the trained from-scratch model, NO LLM):
-       py -m substrate_self.converse
+If you haven't initialized your local Eli yet, run:
+  py -m substrate_self init
 
-     Online weight updates per turn. Sleep replay on `sleep` command.
-     This is the runtime you should use day-to-day.
+That copies the canonical trained Eli that ships with the repo
+(`assets/canonical_eli/`) to `~/.substrate-self/`. From that point on,
+talking to Eli loads the model file + the active partner's LoRA
++ the tokenizer, runs autoregressive char generation in PyTorch, and
+the response comes from those weights. Nothing in this path contacts
+Groq, Anthropic, OpenAI, or any other LLM provider.
 
-  2. BOOTSTRAP (uses Groq while you're collecting training data):
-       py -m substrate_self.converse --voice groq
+The LLM-as-teacher pipeline (`substrate_self.bootstrap.*`,
+`substrate_self.teach.*`) is **offline-only** — it generates corpus
+data at training time. It is never invoked when talking to Eli. If
+you want to train a fresh Eli from your own corpus, see the offline
+training docs; that's a separate pipeline.
 
-     Convenience for early-life substrates that have no trained model yet.
-     The LLM is the teacher / training-wheels — its outputs become your
-     model's training data via `substrate_self.teach.corpus`.
-
-When the trained model is missing, defaults to bootstrap mode with a
-clear note. Use `--solo` to require solo mode (errors out if no model).
+Commands inside the REPL:
+  sleep / consolidate   — replay episodic into LoRA, wipe buffer, save
+  quit / exit           — leave without sleeping (episodic preserved)
 """
 
 from __future__ import annotations
@@ -40,22 +46,23 @@ def model_exists(model_dir: Path) -> bool:
     return (model_dir / "model.pt").exists() and (model_dir / "tokenizer.json").exists()
 
 
-def get_bootstrap_voice(name: str):
-    if name == "groq":
-        from substrate_self.bootstrap.groq import GroqVoice
-        return GroqVoice()
-    raise ValueError(f"Unknown bootstrap voice: {name}. Available: groq")
+def run(args):
+    """SOLO runtime: use the trained model. Online updates per turn.
 
-
-def run_solo(args):
-    """SOLO runtime: use the trained model. Online updates per turn."""
+    If no trained model is found at `model_dir`, this errors out with
+    instructions to run `init`. There is no LLM fallback. The runtime
+    is the weights, end of story.
+    """
     model_dir = args.model_dir or default_model_dir()
     if not model_exists(model_dir):
-        if args.solo:
-            print(f"--solo passed but no trained model at {model_dir}. Run substrate_self.model.train first.", file=sys.stderr)
-            return 2
-        print(f"(no trained model at {model_dir} — falling back to bootstrap voice)")
-        return run_bootstrap(args)
+        print(f"No trained Eli at {model_dir}.", file=sys.stderr)
+        print(file=sys.stderr)
+        print("To meet the canonical Eli that ships with this repo, run:", file=sys.stderr)
+        print("  py -m substrate_self init", file=sys.stderr)
+        print(file=sys.stderr)
+        print("To train a fresh Eli from your own corpus instead, see the", file=sys.stderr)
+        print("offline training pipeline (LLM is the teacher there, not the runtime).", file=sys.stderr)
+        return 2
 
     s = persistence.load()
     s.begin_wake()
@@ -79,7 +86,7 @@ def run_solo(args):
     else:
         optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
 
-    print(f"=== Substrate loaded — SOLO runtime (no LLM) ===")
+    print(f"=== Eli loaded — SOLO runtime (no LLM in the loop) ===")
     print(f"Name: {s.name}  Session: #{s.age_sessions}")
     print(f"Model: {model.num_params():,} params  loaded from {model_dir}")
     if use_lora:
@@ -88,7 +95,8 @@ def run_solo(args):
         loaded_str = "loaded" if lora_runtime["loaded"] else "fresh (zero LoRA)"
         print(f"LoRA:  rank={args.lora_rank} alpha={args.lora_alpha}  {n_lora_params:,} params  "
               f"active={active_label}  ({loaded_str})")
-    print(f"Memories: {len(s.memories)}  partner_facts: {len(s.partner_facts)}  threads: {len(s.open_threads)}")
+    print(f"Memories: {len(s.memories)}  partner_facts: {len(s.partner_facts)}  "
+          f"threads: {len(s.open_threads)}")
     print(f"=== Type 'sleep' to consolidate (replay+wipe), 'quit' to exit without saving ===\n")
 
     try:
@@ -114,7 +122,9 @@ def run_solo(args):
                           f"skipped {metrics['skipped']} other-partner episodes")
                 else:
                     metrics = sleep_replay(model, optimizer, tok, s, replay_passes=3)
-                    print(f"  replay: {metrics['episodes_replayed']} pairs, {metrics['total_steps']} grad steps, mean loss {metrics['mean_loss']:.4f}")
+                    print(f"  replay: {metrics['episodes_replayed']} pairs, "
+                          f"{metrics['total_steps']} grad steps, "
+                          f"mean loss {metrics['mean_loss']:.4f}")
                 s.end_sleep(wipe_episodic=True)
                 if use_lora:
                     if s.active_partner_id is not None:
@@ -126,12 +136,13 @@ def run_solo(args):
                 print(f"(slept — model + substrate saved to {model_dir})")
                 break
 
-            # Inference
+            # Inference — pure forward pass through the loaded weights.
             prompt = substrate_prefix(s, user_input)
             ids = tok.encode(prompt)
             x = torch.tensor(ids, dtype=torch.long).unsqueeze(0)
             with torch.no_grad():
-                out = model.generate(x, max_new_tokens=args.max_tokens, temperature=args.temperature, top_k=args.top_k)
+                out = model.generate(x, max_new_tokens=args.max_tokens,
+                                     temperature=args.temperature, top_k=args.top_k)
             decoded = tok.decode(out[0].tolist())
             agent_text = decoded[len(prompt):]
             if "\nUser:" in agent_text:
@@ -140,7 +151,7 @@ def run_solo(args):
 
             print(f"{s.name}> {agent_text}\n")
 
-            # Online update + episodic
+            # Online update + episodic — Eli physically changes from the experience.
             s.add_episode("user", user_input, significance=0.0)
             s.add_episode("agent", agent_text, significance=0.0)
             loss = online_update(model, optimizer, tok, s, user_input, agent_text)
@@ -159,59 +170,16 @@ def run_solo(args):
     return 0
 
 
-def run_bootstrap(args):
-    """BOOTSTRAP mode: use a teacher LLM. No model training; collect data."""
-    voice = get_bootstrap_voice(args.voice)
-    if args.model:
-        voice.model = args.model
-
-    s = persistence.load()
-    s.begin_wake()
-    print(f"=== Substrate loaded — BOOTSTRAP mode (LLM as teacher) ===")
-    print(f"Name: {s.name}  Session: #{s.age_sessions}  Voice: {voice.model}")
-    print(f"Memories: {len(s.memories)}  partner_facts: {len(s.partner_facts)}  threads: {len(s.open_threads)}")
-    print(f"=== Type 'sleep' to consolidate, 'quit' to exit. ===")
-    print(f"=== Generate corpus from this teacher: py -m substrate_self.teach.corpus_cli ===\n")
-
-    try:
-        while True:
-            try:
-                user_input = input("you> ").strip()
-            except EOFError:
-                print()
-                break
-            if not user_input:
-                continue
-            if user_input.lower() in ("quit", "exit"):
-                print("(exited without sleeping)")
-                break
-            if user_input.lower() in ("sleep", "consolidate"):
-                n = len(s.episodic)
-                s.end_sleep(wipe_episodic=True)
-                print(f"(slept — wiped {n} episodic; bootstrap mode has no weights to consolidate)")
-                break
-
-            s.add_episode("user", user_input, significance=0.0)
-            response = voice.speak(s, user_input)
-            print(f"{s.name}> {response.text}\n")
-            s.add_episode("agent", response.text, significance=0.0)
-    finally:
-        if not args.no_save:
-            persistence.save(s)
-            print(f"(substrate saved)")
-    return 0
-
-
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Talk to your substrate.")
-    parser.add_argument("--solo", action="store_true", help="Require solo runtime (error if no trained model)")
-    parser.add_argument("--voice", default="groq", help="Bootstrap voice (groq) — only used if no trained model")
-    parser.add_argument("--model", default=None, help="Bootstrap model id override")
-    parser.add_argument("--model-dir", type=Path, default=None, help="Trained model directory")
+    parser = argparse.ArgumentParser(
+        description="Talk to Eli. SOLO runtime — no LLM in the loop.")
+    parser.add_argument("--model-dir", type=Path, default=None,
+                        help="Trained model directory (default: ~/.substrate-self/)")
     parser.add_argument("--max-tokens", type=int, default=200)
     parser.add_argument("--temperature", type=float, default=0.85)
     parser.add_argument("--top-k", type=int, default=40)
-    parser.add_argument("--no-save", action="store_true")
+    parser.add_argument("--no-save", action="store_true",
+                        help="Don't save substrate/model on exit")
     parser.add_argument("--no-lora", action="store_true",
                         help="Disable per-partner LoRA shards (legacy single-monolithic-model behavior)")
     parser.add_argument("--lora-rank", type=int, default=4)
@@ -219,7 +187,7 @@ def main() -> int:
     parser.add_argument("--lr-lora", type=float, default=5e-4)
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
-    return run_solo(args)
+    return run(args)
 
 
 if __name__ == "__main__":
