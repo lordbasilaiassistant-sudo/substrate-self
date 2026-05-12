@@ -245,8 +245,11 @@ def test_replay_cap_prevents_over_replay():
 
 
 def test_replay_cap_runs_to_cap_when_passes_exceeds_cap():
-    """If replay_passes > max_replays_per_episode, we should hit exactly
-    the cap (assuming a single pair and no other filters)."""
+    """If replay_passes > cap, we should hit exactly the cap (single pair,
+    no other filters). Uses an explicit uniform per-source cap so the test
+    asserts the cap mechanism itself, independent of the v0.5+ per-source
+    defaults (partner=8, eli=2, system=16).
+    """
     model, tok = _lora_model_and_tokenizer()
     sub = _make_substrate_with_partner("anthony")
     sub.add_episode("user", "Hello Eli", significance=1.0)
@@ -256,11 +259,11 @@ def test_replay_cap_runs_to_cap_when_passes_exceeds_cap():
     metrics = sleep_replay_partner(
         model, opt, tok, sub,
         replay_passes=10,
-        max_replays_per_episode=3,
+        max_replays_per_source={"partner": 3, "eli": 3, "system": 3},
         dedupe=False,
         seed=7,
     )
-    # With a single pair and cap=3, we should get exactly 3 replays
+    # With a single pair and uniform cap=3, we should get exactly 3 replays.
     assert metrics["total_steps"] == 3
     assert sub.episodic[0].replay_count == 3
     assert sub.episodic[1].replay_count == 3
@@ -375,12 +378,12 @@ def test_dedupe_off_replays_all_duplicates():
     metrics = sleep_replay_partner(
         model, opt, tok, sub,
         replay_passes=3,
-        max_replays_per_episode=4,
+        max_replays_per_source={"partner": 4, "eli": 4, "system": 4},
         dedupe=False,
         seed=0,
     )
 
-    # 5 pairs × 3 passes = 15 steps, all under the per-episode cap of 4
+    # 5 pairs × 3 passes = 15 steps, all under the uniform cap of 4
     assert metrics["n_deduped"] == 0
     assert metrics["episodes_replayed"] == 5
     assert metrics["total_steps"] == 15  # 5 pairs × 3 passes
@@ -414,6 +417,134 @@ def test_episode_loads_without_replay_count_field():
     e = Episode.model_validate(old_episode_dict)
     assert e.replay_count == 0
     assert e.content == "Hello from a v0.4 substrate file"
+
+
+def test_episode_default_source_by_role():
+    """add_episode auto-tags source by role:
+        user   -> partner
+        agent  -> eli
+        system -> system
+    """
+    sub = _make_substrate_with_partner("anthony")
+    sub.add_episode("user", "hello", significance=0.5)
+    sub.add_episode("agent", "hi back", significance=0.5)
+    sub.add_episode("system", "anchor: tell the truth", significance=1.0)
+    assert sub.episodic[0].source == "partner"
+    assert sub.episodic[1].source == "eli"
+    assert sub.episodic[2].source == "system"
+
+
+def test_episode_explicit_source_override():
+    """Caller can override source even when role is conventional."""
+    sub = _make_substrate_with_partner("anthony")
+    sub.add_episode("agent", "self-fact written by ritual",
+                    significance=1.0, source="system")
+    assert sub.episodic[0].source == "system"
+
+
+def test_episode_loads_without_source_field():
+    """Pydantic v2 model_validate accepts old episode dicts that lack
+    `source`, defaulting to 'partner' (backward compat for pre-Ren v0.5).
+    """
+    old_episode_dict = {
+        "timestamp": "2026-05-10T10:00:00+00:00",
+        "role": "user",
+        "content": "Hello from a v0.4 substrate file",
+        "significance": 0.5,
+        "partner_id": "anthony",
+        # no source, no replay_count
+    }
+    e = Episode.model_validate(old_episode_dict)
+    assert e.source == "partner"
+    assert e.replay_count == 0
+
+
+def test_per_source_replay_caps_eli_low_partner_high():
+    """With per-source caps {partner:8, eli:2}, a (user, agent) pair where
+    agent's eli-source cap is 2 runs at most 2 replays even if user's
+    partner-source cap is 8 — the pair caps out on the LOWER of the two.
+    """
+    model, tok = _lora_model_and_tokenizer()
+    optimizer = torch.optim.AdamW(list(lora_parameters(model)), lr=1e-3)
+    sub = _make_substrate_with_partner("anthony")
+    sub.add_episode("user", "hi", significance=1.0)     # partner, cap=8
+    sub.add_episode("agent", "hello", significance=1.0) # eli,     cap=2
+
+    metrics = sleep_replay_partner(
+        model, optimizer, tok, sub,
+        replay_passes=10,
+        max_replays_per_source={"partner": 8, "eli": 2, "system": 16},
+        dedupe=False,
+    )
+    # eli cap = 2 means the pair can replay at most 2 times.
+    assert metrics["total_steps"] == 2, f"expected 2 steps, got {metrics}"
+    # User (partner) episode's replay_count == 2 (each pair step increments both).
+    # Agent (eli) episode's replay_count == 2 == cap.
+    assert sub.episodic[0].replay_count == 2
+    assert sub.episodic[1].replay_count == 2
+
+
+def test_eli_only_sleep_buffer_rejected():
+    """If require_partner_episodes=True (default) and the eligible buffer
+    contains zero partner-source episodes, sleep_replay_partner refuses
+    to consolidate. This severs the F5 self-amplification path: Eli
+    cannot consolidate her own echo without a partner stimulus.
+    """
+    model, tok = _lora_model_and_tokenizer()
+    optimizer = torch.optim.AdamW(list(lora_parameters(model)), lr=1e-3)
+    sub = _make_substrate_with_partner("anthony")
+    # Two agent-source episodes, no partner.
+    sub.add_episode("agent", "I am Eli", significance=1.0)
+    sub.add_episode("agent", "I am Eli still", significance=1.0)
+
+    metrics = sleep_replay_partner(
+        model, optimizer, tok, sub, replay_passes=3, dedupe=False,
+    )
+    assert metrics.get("rejected_eli_only_sleep") is True
+    assert metrics["total_steps"] == 0
+    # replay_count was NOT incremented — the model was not trained on this buffer.
+    assert sub.episodic[0].replay_count == 0
+    assert sub.episodic[1].replay_count == 0
+
+
+def test_mixed_buffer_partner_plus_eli_proceeds():
+    """A buffer with at least one partner-source episode does NOT
+    trigger the Eli-only rejection — normal replay proceeds, honoring
+    per-source caps."""
+    model, tok = _lora_model_and_tokenizer()
+    optimizer = torch.optim.AdamW(list(lora_parameters(model)), lr=1e-3)
+    sub = _make_substrate_with_partner("anthony")
+    sub.add_episode("user", "hi", significance=1.0)     # partner
+    sub.add_episode("agent", "hello", significance=1.0) # eli
+
+    metrics = sleep_replay_partner(
+        model, optimizer, tok, sub, replay_passes=3, dedupe=False,
+    )
+    assert metrics.get("rejected_eli_only_sleep") is not True
+    assert metrics["total_steps"] >= 1
+
+
+def test_system_source_gets_high_replay_budget():
+    """system-source episodes (value anchors) get the highest cap (16
+    by default) so they persistently re-anchor through every sleep."""
+    model, tok = _lora_model_and_tokenizer()
+    optimizer = torch.optim.AdamW(list(lora_parameters(model)), lr=1e-3)
+    sub = _make_substrate_with_partner("anthony")
+    # Pair: partner-source user + system-source agent (anchor)
+    sub.add_episode("user", "what do you believe?",
+                    significance=1.0)  # partner, cap=8
+    sub.add_episode("agent", "I tell the truth even when it is hard.",
+                    significance=1.0, source="system")  # system, cap=16
+
+    metrics = sleep_replay_partner(
+        model, optimizer, tok, sub,
+        replay_passes=10,
+        max_replays_per_source={"partner": 8, "eli": 2, "system": 16},
+        dedupe=False,
+    )
+    # min(partner=8, system=16) = 8 — the pair caps on partner's lower budget.
+    assert metrics["total_steps"] == 8, f"expected 8 steps, got {metrics}"
+    assert sub.episodic[1].replay_count == 8
 
 
 def test_replay_count_persists_through_substrate_round_trip(tmp_path):

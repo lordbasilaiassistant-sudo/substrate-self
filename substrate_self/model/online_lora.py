@@ -98,6 +98,8 @@ def sleep_replay_partner(
     significance_threshold: float = 0.0,
     seed: int = 0,
     max_replays_per_episode: int = 8,
+    max_replays_per_source: Optional[dict] = None,
+    require_partner_episodes: bool = True,
     dedupe: bool = True,
     dedupe_threshold: float = 0.85,
 ) -> dict:
@@ -109,12 +111,33 @@ def sleep_replay_partner(
     Carlini-defense parameters (arXiv 2202.07646 — memorization scales
     log-linearly with duplication; sleep replay IS duplication):
 
-      `max_replays_per_episode` — once an episode has been replayed this
-        many times in its lifetime (cumulative across sleep cycles), it
-        is excluded from further replay passes. Default 8: gives the
-        substrate enough exposures to consolidate a turn without driving
-        Carlini-style verbatim memorization. Tunable; bench owns the
-        empirical sweep.
+      `max_replays_per_episode` — fallback per-episode cap when an
+        episode's source isn't in `max_replays_per_source` (default 8).
+
+      `max_replays_per_source` — per-source replay budget dict, e.g.
+        {"partner": 8, "eli": 2, "system": 16}. Defaults to that mapping
+        if None. Closes the F2/F5 closed-loop self-amplification vector
+        from `notes/threat_model_eli_scaled.md`:
+          - partner=8  : partner-provided content is the actual stimulus;
+                         full Carlini-aligned budget.
+          - eli=2      : Eli's own generated content (agent episodes) is
+                         what Eli already "knows" from her weights —
+                         replaying it just memorizes the surface form
+                         without new information AND is the attack vector
+                         a hostile partner exploits to make Eli train
+                         herself. Cap low.
+          - system=16  : value-anchor episodes (`research_substrate_alignment.md`)
+                         are deliberate persistent memory; higher budget
+                         because they're meant to stay encoded.
+        Per-source caps take precedence over `max_replays_per_episode`
+        when the source key is present.
+
+      `require_partner_episodes` — if True (default) and zero
+        partner-source episodes are eligible after filtering, abort
+        with `rejected_eli_only_sleep=True` in metrics and DO NOT replay
+        any episode. This stops Eli from consolidating a buffer that
+        contains only her own outputs — the echo-chamber failure mode
+        named in `notes/threat_model_eli_scaled.md` F5.
 
       `dedupe` (bool) — if True, run `dedupe_episodes` BEFORE pairing
         user/agent turns. Eliminates near-duplicate (role, partner_id)
@@ -144,6 +167,8 @@ def sleep_replay_partner(
     """
     g = torch.Generator().manual_seed(seed)
     active = _active_partner_id(substrate)
+    if max_replays_per_source is None:
+        max_replays_per_source = {"partner": 8, "eli": 2, "system": 16}
 
     def belongs(ep) -> bool:
         if ep.significance < significance_threshold:
@@ -157,6 +182,22 @@ def sleep_replay_partner(
 
     eligible_episodes = [ep for ep in substrate.episodic if belongs(ep)]
     skipped = len(substrate.episodic) - len(eligible_episodes)
+
+    # F5 defense: refuse to consolidate a buffer that contains zero
+    # partner-source episodes. Eli must not sleep on her own echo.
+    n_partner_eligible = sum(
+        1 for ep in eligible_episodes
+        if getattr(ep, "source", "partner") == "partner"
+    )
+    if require_partner_episodes and n_partner_eligible == 0 and eligible_episodes:
+        return {
+            "total_steps": 0, "mean_loss": 0.0, "episodes_replayed": 0,
+            "partner_id": active, "skipped": skipped,
+            "n_deduped": 0, "n_capped_out": 0,
+            "max_replay_count_seen": 0,
+            "rejected_eli_only_sleep": True,
+            "rejection_reason": "no partner-source episodes in eligible buffer",
+        }
 
     # Dedupe BEFORE pairing — near-duplicate stealth duplication is what
     # Carlini's law catches; we want it stripped before turn-pairing
@@ -194,10 +235,14 @@ def sleep_replay_partner(
             "max_replay_count_seen": 0,
         }
 
+    def _cap_for(ep) -> int:
+        src = getattr(ep, "source", "partner")
+        return max_replays_per_source.get(src, max_replays_per_episode)
+
     def _cap_ok(pair: tuple[Episode, Episode]) -> bool:
         u, a = pair
-        return (u.replay_count < max_replays_per_episode and
-                a.replay_count < max_replays_per_episode)
+        return (u.replay_count < _cap_for(u) and
+                a.replay_count < _cap_for(a))
 
     losses: list[float] = []
     capped_out_pairs: set[int] = set()  # indices into `pairs` that hit the cap

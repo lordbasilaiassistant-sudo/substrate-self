@@ -51,14 +51,25 @@ class Episode(BaseModel):
     `model/replay_filters.py`) reads this to decide whether the episode is
     still eligible for replay. Defaults to 0; loads with default for any
     pre-v0.5 episode that didn't carry the field.
+
+    `source` distinguishes who produced this turn — closes the closed-loop
+    self-amplification vector named F2/F5 in `notes/threat_model_eli_scaled.md`.
+    Sleep replay consults `source` to apply per-source caps: partner content
+    gets full duplication budget (max_replays_per_source["partner"] = 8),
+    Eli's own generated content gets a lower budget (max=2) so Eli cannot
+    self-amplify a hostile-injected episodic buffer by replaying its own
+    completions, and `system` content (e.g. value-anchor injections) gets
+    its own budget. Defaults to "partner" for backwards compatibility;
+    `Substrate.add_episode` auto-tags by role (user -> partner, agent -> eli).
     """
 
     timestamp: str = Field(default_factory=_now)
-    role: str  # "user" | "agent"
+    role: str  # "user" | "agent" | "system"
     content: str
     significance: float = 0.0  # 0 (trivial) to 1 (load-bearing)
     partner_id: Optional[str] = None  # which partner this turn was with
     replay_count: int = 0  # how many times sleep-replayed (Carlini-defense)
+    source: str = "partner"  # "partner" | "eli" | "system" — per-source cap key
 
 
 class Memory(BaseModel):
@@ -315,10 +326,22 @@ class Substrate(BaseModel):
         self.last_sleep = _now()
 
     def add_episode(self, role: str, content: str, significance: float = 0.0,
-                    partner_id: Any = _UNSET) -> None:
+                    partner_id: Any = _UNSET,
+                    source: Optional[str] = None) -> None:
+        """Append an episode. Auto-tags `source` by role unless an explicit
+        override is passed:
+          role="user"   -> source="partner"
+          role="agent"  -> source="eli"
+          role="system" -> source="system"
+        The source tag controls per-source replay caps at sleep time
+        (see `substrate_self/model/online_lora.py::sleep_replay_partner`).
+        """
         pid = self.active_partner_id if partner_id is _UNSET else partner_id
+        if source is None:
+            source = {"user": "partner", "agent": "eli", "system": "system"}.get(role, "partner")
         self.episodic.append(Episode(role=role, content=content,
-                                     significance=significance, partner_id=pid))
+                                     significance=significance, partner_id=pid,
+                                     source=source))
 
     def add_memory(self, text: str, tags: list[str] | None = None, weight: float = 1.0,
                    partner_id: Any = _UNSET) -> None:
