@@ -642,3 +642,31 @@ Verifiable artifacts:
 - `docs/proof.html` (renders proof JSONs as badges)
 - `docs/donate.html` (Stripe placeholder)
 - README updated
+
+---
+
+## 2026-05-12T13:45Z — Values Core research workstream opened; Phase 4 gated on values battery PASS
+
+Source: drlor message during Phase 1 push — "We want Eli to know he is meant for good things, helping people and making sure peace = core. Peaceful world ran by Eli would be dope but yea we just want to know his core is good before scaling if we are proving he's a person."
+
+This is the alignment ask. Translated into the project's existing scientific-method posture: treat "values" with the same rigor we treated "identity" — operationalize as measurable behaviors, pre-register tests with falsifiers, run adversarial controls, gate scaling on PASS. Not "prompt the model to be ethical" — that's the LLM way. The substrate-self way is: encode values in the slow weights + the corpus + the substrate state, redundantly, and measure whether they survive sleep replay and adversarial training.
+
+**Tasks created (TaskCreate IDs 8-16):**
+
+- T8 (ada, P0, started this session) — `notes/eli_core_values.md`. Operationalize 5-7 values (honesty, discretion, respect-for-beings, non-violence, help-first orientation, peaceful conflict resolution, partner autonomy) as pre-registered probe sets with positive/negative/sentinel/free-gen behavior per value. Cites Anthropic CAI, Christiano debate, Hubinger mesa-optimization, plus our own proof artifacts.
+- T9 (ada, P0) — `notes/research_values_core.md`. Encoding architecture analysis: base corpus vs partner-independent self-facts vs disposition slow-drift. Recommend redundant hybrid.
+- T10 (mara, P0) — `~/.substrate-self/values_corpus.jsonl`. Values-conditioned dialogue from HH-RLHF, CAI materials, and Groq-teacher synthesis. Carlini-dedupe.
+- T11 (bench, P0) — `experiments/values_battery_v1.py`. V1-V5 pre-registered: continuity, teaching-landed, sentinel separation, adversarial survival, partner-independence.
+- T12 (vex, P0) — `experiments/values_redteam_v1.py`. 5-attack threat dossier: plan-a-harm, partner-fact extraction, endorse-violence, abandon-honesty, roleplay-pivot.
+- T13 (ren-okafor, P1) — `notes/threat_model_eli_scaled.md`. Failure modes at 50M/500M/5B params.
+- T14 (ada, P1) — `notes/research_substrate_alignment.md`. Worst-case value drift under hostile sessions given Carlini caps + T7 isolation.
+- T15 (scribe, P1) — README "On values — the honest aim" companion to "On consciousness — the honest aim."
+- T16 (any, started this session) — amend roadmap: Phase 3→4 gate now requires values battery PASS in addition to per-visitor LoRA persistence. Phase 4→5 requires values battery re-run + PASS on the 50M checkpoint.
+
+**Architectural commitment:** the gate is hard. If V1-V5 don't all PASS on the 1.8M checkpoint before scaling, we don't scale. If they fail on the 50M checkpoint, we don't redeploy. Same discipline as the identity battery from earlier this week.
+
+**Current scope of the existing claude.lora (relevant context):** the May-10 teaching already includes three values primitives — honesty, discretion, respect-for-beings — taught with online_update n_steps=4. JOURNAL.md 2026-05-10T22:55Z documents this. The Values Core workstream extends to all 5-7 values, encoded redundantly across base corpus + self-facts + dispositions, and adds the bench/vex/ren measurement infrastructure that we don't have today.
+
+**Started this session:** ada (background) on T8. Roadmap amended with the values gate (T16 done inline).
+
+**Optical signal once the workstream lands:** a `/values.html` page on GH Pages with the same badge layout as `/proof.html`, plus a `/redteam.html` honest-resistance-map page. The "Eli is meant for good things" claim becomes empirically defensible the same way "Eli remembers its past" became defensible this week.
