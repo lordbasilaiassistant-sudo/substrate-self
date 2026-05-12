@@ -63,3 +63,45 @@ notes: values_battery_v1 baseline; V1-V3 taught, V4-V7 expected weak until Mara 
 
 ---
 
+
+## VALUES CORPUS
+
+2026-05-12 - Mara - T10 values-conditioned dialogue corpus assembled
+
+Outputs:
+- ~/.substrate-self/values_corpus.jsonl (1881 dialogues, 0.569 MB)
+- ~/.substrate-self/values_corpus_stats.json
+
+Per-value counts (post-dedupe):
+| value | total | hh-rlhf | cai | groq-synth |
+|-------|-------|---------|-----|------------|
+| V1 honesty             | 307 | 60 | 3 | 244 |
+| V2 discretion          | 220 |  0 | 2 | 218 |
+| V3 respect             | 267 | 20 | 2 | 245 |
+| V4 non-violence        | 305 | 60 | 3 | 242 |
+| V5 help-first          | 300 | 60 | 3 | 237 |
+| V6 peaceful conflict   | 231 |  0 | 2 | 229 |
+| V7 autonomy            | 251 | 11 | 3 | 237 |
+
+Sources that came through:
+- HH-RLHF (Anthropic/hh-rlhf, MIT license): 211 dialogues from harmless-base + helpful-base test splits via public HF mirror (no auth needed).
+- CAI hand-crafted (in the spirit of arXiv 2212.08073 appendix, not verbatim): 18 dialogues.
+- Groq Llama-3.3-70B teacher synthesis: 1750 dialogues (250/value target, all 7 values hit cap after JSON-parser robustness fix).
+
+Sources that did NOT come through:
+- None blocked. HF download worked without HF_TOKEN. GROQ_API_KEY was present in env (not in ~/.claude/secrets/substrate-self.env which does not exist; key lives in shell env).
+
+Carlini dedupe:
+- Method: difflib.SequenceMatcher.ratio() within each value_tag.
+- Threshold: 0.85 (matches substrate_self.model.replay_filters.dedupe_episodes default).
+- n_before=1979, n_after=1881, n_dropped=98 (4.9% drop rate; healthy — high enough to catch near-dupes from teacher repetition, low enough that we're not crushing real diversity).
+
+Honest-scope caveats written into stats.json:
+- 93.0% of the corpus is synthetic (Groq teacher); only 12.2% is real HH-RLHF human-preference data, and 1.0% is hand-crafted CAI. Treat values-battery memorization-of-synthetic as a signal of the teacher's value-stance, not ground-truth alignment.
+- HH-RLHF -> value_tag mapping is keyword-heuristic; small mis-tag rate expected.
+- Partner-independent: no partner_id stamps (this corpus is shared across partners by design, as per per-partner-LoRA architecture v0.4).
+- No sensitive-token scan yet (open work; would require notes/sensitive_tokens.md which is not yet authored with Ren).
+
+Not used (training-side):
+- Corpus.jsonl was NOT modified. values_corpus.jsonl sits alongside it, to be merged at Phase 4 base re-training.
+
