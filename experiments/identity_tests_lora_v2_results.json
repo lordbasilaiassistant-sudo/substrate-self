@@ -4,14 +4,14 @@
     "pass": true
   },
   "T1_ext": {
-    "pre_post_cosine": 0.999988853931427,
+    "pre_post_cosine": 0.9999881982803345,
     "sample_depth": 20,
     "pass": true
   },
   "T2": {
-    "taught_drop": 3.00449800491333,
-    "control_drop": 0.6102874279022217,
-    "selectivity": 2.3942105770111084,
+    "taught_drop": 3.0052459836006165,
+    "control_drop": 0.39884042739868164,
+    "selectivity": 2.606405556201935,
     "pass": true
   },
   "T5": {

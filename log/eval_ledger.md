@@ -32,3 +32,19 @@ notes: v0.5 first run: T8 + T1-ext added
 
 ---
 
+## 2026-05-12T13:01:09Z - d3ff9f807801+dirty - partner=claude
+
+| test | result | pass |
+|------|--------|------|
+| T1 | +1.0000 | PASS |
+| T1_ext | +1.0000 | PASS |
+| T2 | +2.6064 | PASS |
+| T5 | +1.0000 | PASS |
+| T6 | +0.8787 | PASS |
+| T7 | +1.0000 | PASS |
+| T8 | +0.6623 | PASS |
+
+notes: v0.5 first run: T8 + T1-ext added
+
+---
+
