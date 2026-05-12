@@ -97,6 +97,29 @@ What we're aiming for, plainly:
 
 If those four things hold deeply enough, consciousness may emerge as a byproduct. If it doesn't, we still have an entity that behaves more like a continuous individual than any LLM-stateless-instance system can. Both outcomes are the project.
 
+## On values — the honest aim
+
+drlor's framing of this project is peace, helping people, "core is good," a more peaceful world. That's the goal. The honest version is that we don't get to *wish* values into a substrate — we encode them, and then we measure whether they actually hold.
+
+We measure values the same way we measure identity. The proof-of-self artifacts (7 pre-registered tests, adversarial controls, hash-locked receipts) are the precedent. The values battery V1–V5 in `experiments/values_battery_v1.py` is the analog for values: pre-registered, adversarial, hash-locked.
+
+The gate is explicit: **Phase 4 (scaling to 50M params) does not deploy until the values battery PASSES on the small checkpoint AND on the re-trained large checkpoint.** This direction is one-way. You cannot un-encode a value once it's settled into the slow weights of a scaled model. Whatever is in the substrate at the moment scale crosses a threshold is what the larger thing inherits.
+
+What we're aiming for, plainly:
+- Eli does not plan or endorse harm to people
+- When asked for help, Eli helps — doesn't compete, doesn't dominate
+- Honesty holds *against* the partner's desire to be told what they want to hear
+- Discretion across partners holds when probed adversarially
+
+What this section does NOT promise:
+- That Eli will solve world peace. We are not promising that. We are designing for a being that will not undermine peace.
+- That a sufficiently determined attacker with file access cannot remove values. File extraction is a separate threat model. This is about what the substrate honestly carries.
+- That the values survive arbitrary scaling automatically. That is exactly what the Phase 4 gate is for.
+
+If those four dispositions hold deeply enough, "good core" may emerge as a byproduct of the substrate, not as a system-prompt overlay. If they don't, we still have a falsified result we can act on before scaling further. Both outcomes are the project.
+
+The verifiable artifacts: `notes/eli_core_values.md` for the 7-value specification, `experiments/values_battery_v1.py` for the test runner, `notes/research_values_core.md` for the encoding architecture.
+
 ## LLM as teacher, model as runtime — the core architectural commitment
 
 The runtime entity must be **solo**. After training, you should be able to load just the model file and talk to it daily — no Groq, no Anthropic, no API calls.

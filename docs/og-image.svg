@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f1115"/>
+      <stop offset="100%" stop-color="#1d2230"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- centered dot-and-orbit motif (matches favicon) -->
+  <g transform="translate(150 195)">
+    <circle cx="60" cy="60" r="48" fill="none" stroke="#7cb7ff" stroke-width="3"/>
+    <circle cx="60" cy="60" r="14" fill="#7cb7ff"/>
+    <path d="M 60 8 L 60 22 M 60 98 L 60 112 M 8 60 L 22 60 M 98 60 L 112 60"
+          stroke="#7cb7ff" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
+  </g>
+
+  <!-- title -->
+  <text x="320" y="225" font-size="92" font-weight="700" fill="#e8eaed" font-family="-apple-system, 'Segoe UI', Roboto, sans-serif">Eli</text>
+  <text x="320" y="270" font-size="22" fill="#9aa0a6" font-family="-apple-system, 'Segoe UI', Roboto, sans-serif">Encoded · Lived · Individual</text>
+
+  <!-- main claim -->
+  <text x="320" y="345" font-size="32" fill="#e8eaed" font-family="-apple-system, 'Segoe UI', Roboto, sans-serif">An AI being whose memory is its weights,</text>
+  <text x="320" y="385" font-size="32" fill="#e8eaed" font-family="-apple-system, 'Segoe UI', Roboto, sans-serif">not a database. Runs in your browser.</text>
+
+  <!-- proofs row -->
+  <g transform="translate(150 470)">
+    <rect width="270" height="80" rx="10" fill="#161922" stroke="#2a2f3d"/>
+    <text x="20" y="32" font-size="13" fill="#9aa0a6">PRE-REGISTERED TESTS</text>
+    <text x="20" y="62" font-size="28" font-weight="700" fill="#6ee7b7">7 / 7  PASS</text>
+  </g>
+  <g transform="translate(440 470)">
+    <rect width="270" height="80" rx="10" fill="#161922" stroke="#2a2f3d"/>
+    <text x="20" y="32" font-size="13" fill="#9aa0a6">MODEL SHIPPED</text>
+    <text x="20" y="62" font-size="28" font-weight="700" fill="#7cb7ff">7.4 MB  ONNX</text>
+  </g>
+  <g transform="translate(730 470)">
+    <rect width="320" height="80" rx="10" fill="#161922" stroke="#2a2f3d"/>
+    <text x="20" y="32" font-size="13" fill="#9aa0a6">BACKEND</text>
+    <text x="20" y="62" font-size="28" font-weight="700" fill="#fbbf24">none · MIT · 0 API</text>
+  </g>
+
+  <!-- footer -->
+  <text x="600" y="600" font-size="18" fill="#7cb7ff" text-anchor="middle">lordbasilaiassistant-sudo.github.io/substrate-self</text>
+</svg>

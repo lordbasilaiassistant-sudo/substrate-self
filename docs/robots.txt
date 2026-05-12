@@ -1,0 +1,19 @@
+User-agent: *
+Allow: /
+
+# AI crawlers / agent-frameworks: substrate-self is open by design.
+# Citations welcome. Model file is hash-locked; tampering is detectable.
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://lordbasilaiassistant-sudo.github.io/substrate-self/sitemap.xml
