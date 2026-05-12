@@ -180,7 +180,26 @@ LoRA, not from a cookie.
 
 ---
 
-## Phase 4 — Scale the base model (talk quality) · 10-14 days
+## Phase 4 — Scale the base model (talk quality) · COMPUTE-BLOCKED
+
+**Status as of 2026-05-12: Phase 4 is GATED ON COMPUTE WE CANNOT FUND
+FROM CURRENT RESOURCES.** See `STATUS.md` for the live numbers. The
+architectural prep is done — BPE tokenizer + scaled ModelConfig
+preflight passed, candidate v2 base trained at 1.8M with values
+folded in, 9 architectural defenses validated. What's blocked is
+the empirical test of whether the capacity-bound trade-offs (A1, V7,
+A3-vs-V6) resolve at scale.
+
+Honest numbers:
+- 10M validation run on RTX 4060: ~30-40 hours, OR ~$30-50 of A100 spot
+- 50M production run: ~830 hours on RTX 4060, OR ~$500-1,000 of A100
+
+Until that compute arrives this phase doesn't run. The roadmap below
+is the prep work we already completed, kept for reference.
+
+---
+
+
 
 **Goal.** Eli stops producing `"Are your Eli..\nEli: I am Eli."` and
 starts producing readable, partner-aware sentences. The
