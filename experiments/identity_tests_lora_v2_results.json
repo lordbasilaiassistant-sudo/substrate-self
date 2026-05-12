@@ -1,17 +1,17 @@
 {
   "T1": {
-    "pre_post_cosine": 1.0,
+    "pre_post_cosine": 0.9999999403953552,
     "pass": true
   },
   "T1_ext": {
-    "pre_post_cosine": 0.9999642968177795,
+    "pre_post_cosine": 0.999982476234436,
     "sample_depth": 20,
     "pass": true
   },
   "T2": {
-    "taught_drop": 2.9423328936100006,
-    "control_drop": 0.4930391311645508,
-    "selectivity": 2.44929376244545,
+    "taught_drop": 3.0008068084716797,
+    "control_drop": 0.49970388412475586,
+    "selectivity": 2.501102924346924,
     "pass": true
   },
   "T5": {

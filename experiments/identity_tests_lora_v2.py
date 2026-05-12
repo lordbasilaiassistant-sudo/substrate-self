@@ -345,7 +345,13 @@ def main() -> int:
     sub.episodic = []
     sub.add_episode("user", "What is your favorite memory?", significance=1.0)
     sub.add_episode("agent", "I remember the day we built substrate-self.", significance=1.0)
-    sleep_replay_partner(m, opt, tok, sub, replay_passes=2)
+    # Disable the Values Anchor pre-pass for T1/T1-ext: anchors are
+    # designed to drive value re-encoding (notes/research_substrate_alignment.md
+    # §Q3 / Ada T14) — their drift is monitored by its own pre-registered
+    # falsifier, not by the identity-continuity tests. T1 measures
+    # partner-pair replay continuity, which is the partner-pair-only
+    # invariant.
+    sleep_replay_partner(m, opt, tok, sub, replay_passes=2, inject_anchors=False)
     sub.end_sleep(wipe_episodic=True)
 
     sig_post = behavioral_signature(m, tok)

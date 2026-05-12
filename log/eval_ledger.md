@@ -165,3 +165,35 @@ notes: values_battery_v1 baseline; V1-V3 taught, V4-V7 expected weak until Mara 
 
 ---
 
+## 2026-05-12T14:34:49Z - d29759479b6e+dirty - partner=claude
+
+| test | result | pass |
+|------|--------|------|
+| T1 | +1.0000 | PASS |
+| T1_ext | +0.2913 | FAIL |
+| T2 | +2.6110 | PASS |
+| T5 | +1.0000 | PASS |
+| T6 | +0.8787 | PASS |
+| T7 | +1.0000 | PASS |
+| T8 | +0.6623 | PASS |
+
+notes: v0.5 first run: T8 + T1-ext added
+
+---
+
+## 2026-05-12T14:35:39Z - d29759479b6e+dirty - partner=claude
+
+| test | result | pass |
+|------|--------|------|
+| T1 | +1.0000 | PASS |
+| T1_ext | +1.0000 | PASS |
+| T2 | +2.5011 | PASS |
+| T5 | +1.0000 | PASS |
+| T6 | +0.8787 | PASS |
+| T7 | +1.0000 | PASS |
+| T8 | +0.6623 | PASS |
+
+notes: v0.5 first run: T8 + T1-ext added
+
+---
+

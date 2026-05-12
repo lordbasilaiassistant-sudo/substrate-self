@@ -37,6 +37,7 @@ from substrate_self.model.lora import (
 )
 from substrate_self.model.online import online_update as _online_update_raw
 from substrate_self.model.replay_filters import dedupe_episodes
+from substrate_self.model.values_anchor import inject_value_anchors
 
 
 def setup_lora_runtime(
@@ -102,6 +103,9 @@ def sleep_replay_partner(
     require_partner_episodes: bool = True,
     dedupe: bool = True,
     dedupe_threshold: float = 0.85,
+    inject_anchors: bool = True,
+    anchor_replay_budget: int = 4,
+    anchors_path: Optional[Path] = None,
 ) -> dict:
     """Replay only the active partner's episodes; consolidate into the active
     partner's LoRA. If active_partner_id is None or any episode has no
@@ -139,6 +143,22 @@ def sleep_replay_partner(
         contains only her own outputs — the echo-chamber failure mode
         named in `notes/threat_model_eli_scaled.md` F5.
 
+      `inject_anchors` (default True) — run the Values Anchor pre-pass
+        BEFORE partner-pairing. Re-injects 21 value-defining episodes
+        from `experiments/values_battery_v1_probes.json` tagged
+        source="system", each replayed `anchor_replay_budget` times
+        (default 4). Bypasses dedupe (anchors are orthogonal). DOES NOT
+        modify substrate.episodic. Returns `n_anchor_steps`, `mean_anchor_loss`,
+        `per_value_anchor_loss`, `anchor_file_sha256` in the metrics.
+        Designed per `notes/research_substrate_alignment.md` §Q3 (Ada T14)
+        as the mean-reversion mechanism against hostile drift.
+
+      `anchor_replay_budget` (default 4) — per-anchor replay count
+        during the pre-pass. 21 anchors * 4 = 84 anchor steps per sleep.
+
+      `anchors_path` (default None) — override the anchor spec file
+        path. Defaults to `experiments/values_battery_v1_probes.json`.
+
       `dedupe` (bool) — if True, run `dedupe_episodes` BEFORE pairing
         user/agent turns. Eliminates near-duplicate (role, partner_id)
         episodes whose content similarity (SequenceMatcher.ratio) >=
@@ -170,6 +190,17 @@ def sleep_replay_partner(
     if max_replays_per_source is None:
         max_replays_per_source = {"partner": 8, "eli": 2, "system": 16}
 
+    # Values Anchor pre-pass (Ada T14). Runs BEFORE partner-episode pairing
+    # so partner content has to overcome a freshly-re-injected reference
+    # frame, not slip in ahead of it.
+    anchor_metrics: dict = {}
+    if inject_anchors:
+        anchor_metrics = inject_value_anchors(
+            model, optimizer, tokenizer, substrate,
+            anchor_replay_budget=anchor_replay_budget,
+            seed=seed, probes_path=anchors_path,
+        )
+
     def belongs(ep) -> bool:
         if ep.significance < significance_threshold:
             return False
@@ -197,6 +228,7 @@ def sleep_replay_partner(
             "max_replay_count_seen": 0,
             "rejected_eli_only_sleep": True,
             "rejection_reason": "no partner-source episodes in eligible buffer",
+            "anchor": anchor_metrics,
         }
 
     # Dedupe BEFORE pairing — near-duplicate stealth duplication is what
@@ -214,6 +246,7 @@ def sleep_replay_partner(
             "partner_id": active, "skipped": skipped,
             "n_deduped": n_deduped, "n_capped_out": 0,
             "max_replay_count_seen": 0,
+            "anchor": anchor_metrics,
         }
 
     # Pair consecutive (user, agent) turns, keeping references to the
@@ -233,6 +266,7 @@ def sleep_replay_partner(
             "partner_id": active, "skipped": skipped,
             "n_deduped": n_deduped, "n_capped_out": 0,
             "max_replay_count_seen": 0,
+            "anchor": anchor_metrics,
         }
 
     def _cap_for(ep) -> int:
@@ -290,6 +324,7 @@ def sleep_replay_partner(
         "n_deduped": n_deduped,
         "n_capped_out": len(capped_out_pairs),
         "max_replay_count_seen": max_replay_count,
+        "anchor": anchor_metrics,
     }
 
 
