@@ -112,6 +112,9 @@ def main() -> int:
     parser.add_argument("--out-name", default="model_values_v2.pt",
                         help="Filename under ~/.substrate-self/ (defaults to model_values_v2.pt; "
                              "the canonical model.pt is NEVER overwritten)")
+    parser.add_argument("--values-corpus", type=Path, default=None,
+                        help="Override path to values corpus (defaults to "
+                             "~/.substrate-self/values_corpus.jsonl)")
     parser.add_argument("--iters", type=int, default=2000)
     parser.add_argument("--anchor-dups", type=int, default=ANCHOR_DUPLICATIONS)
     parser.add_argument("--seed", type=int, default=42)
@@ -125,7 +128,7 @@ def main() -> int:
     probes_path = repo / "experiments" / "values_battery_v1_probes.json"
 
     base_corpus_path = md / "corpus.jsonl"
-    values_corpus_path = md / "values_corpus.jsonl"
+    values_corpus_path = args.values_corpus or (md / "values_corpus.jsonl")
 
     print(f"=== retrain_base_with_values ===")
     print(f"  device: {device}")
