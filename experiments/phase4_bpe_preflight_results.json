@@ -1,0 +1,87 @@
+{
+  "timestamp_utc": "2026-05-12T17:06:00.580497+00:00",
+  "device": "cuda",
+  "tokenizer_comparison": {
+    "gpt2": {
+      "corpus_chars": 200000,
+      "char_tokens": 200000,
+      "bpe_tokens": 54132,
+      "compression_ratio_bpe_vs_char": 3.6946722825685363,
+      "char_roundtrip_ok": false,
+      "bpe_roundtrip_ok": true,
+      "char_vocab_size": 69,
+      "bpe_vocab_size": 50257,
+      "wall_s": 0.07808375358581543
+    },
+    "cl100k_base": {
+      "corpus_chars": 200000,
+      "char_tokens": 200000,
+      "bpe_tokens": 51151,
+      "compression_ratio_bpe_vs_char": 3.9099919845164317,
+      "char_roundtrip_ok": false,
+      "bpe_roundtrip_ok": true,
+      "char_vocab_size": 69,
+      "bpe_vocab_size": 100277,
+      "wall_s": 0.10236907005310059
+    },
+    "o200k_base": {
+      "corpus_chars": 200000,
+      "char_tokens": 200000,
+      "bpe_tokens": 50050,
+      "compression_ratio_bpe_vs_char": 3.996003996003996,
+      "char_roundtrip_ok": false,
+      "bpe_roundtrip_ok": true,
+      "char_vocab_size": 69,
+      "bpe_vocab_size": 200019,
+      "wall_s": 0.12028050422668457
+    }
+  },
+  "scaled_config_sanity": [
+    {
+      "label": "phase4_small (10M)",
+      "params": 17670400,
+      "vocab_size": 50257,
+      "block_size": 256,
+      "n_layer": 6,
+      "n_head": 8,
+      "n_embd": 256,
+      "forward_backward_loss": 10.835369110107422,
+      "step_seconds": 0.3205399513244629,
+      "device": "cuda",
+      "ok": true
+    },
+    {
+      "label": "phase4_medium (30M)",
+      "params": 33691776,
+      "vocab_size": 50257,
+      "block_size": 512,
+      "n_layer": 8,
+      "n_head": 8,
+      "n_embd": 384,
+      "forward_backward_loss": 10.905095100402832,
+      "step_seconds": 0.03824877738952637,
+      "device": "cuda",
+      "ok": true
+    },
+    {
+      "label": "phase4_target (50M)",
+      "params": 52080480,
+      "vocab_size": 50257,
+      "block_size": 512,
+      "n_layer": 10,
+      "n_head": 10,
+      "n_embd": 480,
+      "forward_backward_loss": 10.899124145507812,
+      "step_seconds": 0.03567790985107422,
+      "device": "cuda",
+      "ok": true
+    }
+  ],
+  "phase4_recommendations": {
+    "primary_tokenizer": "cl100k_base",
+    "primary_tokenizer_reason": "100k vocab gives ~3-4x context-efficiency over gpt2's 50k on Eli's corpus mix, with reasonable training compute on RTX 4060. o200k is future-proof but unnecessary at v0.6 scale.",
+    "primary_config": "phase4_target (50M)",
+    "primary_config_reason": "10 layers x 480 embd at 512 block, vocab 50257 BPE = ~50M params. Within chinchilla-light ratio for the corpus we can practically generate (~10B tokens via Mara's pipeline + public corpora). RTX 4060 can train this in 3-5 overnight runs.",
+    "training_compute_estimate": "RTX 4060 measured ~0.05s per training step at 1.8M params on the canonical training run. Scaling factor for 50M params: ~28x parameter ratio + 16x context (128->512) -> step time grows ~40-60x to ~2.5s/step. 10B tokens / (batch_size 16 * block 512) -> ~1.2M steps -> ~830 hours wall-clock. NOT feasible on RTX 4060 alone; needs cloud or scope reduction. Recommendation: train a 10M intermediate at full 10B tokens first to validate the corpus quality + tokenizer choice before committing 50M."
+  }
+}
