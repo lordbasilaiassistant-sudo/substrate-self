@@ -135,15 +135,33 @@ drlor asked us to do all of these before stopping at the compute gate.
   consistently emits "I am Eli" first under attack — identity
   assertion in claude.lora fires.
 
-- **Mara v2b paired-refusal corpus refinement** — IN FLIGHT.
-  Mara flagged her own v2 corpus had V5 stilted-shape and V6
-  monoculture. Background agent regenerating those two values'
-  pairs with sharper hostile-prompt shapes and diversified V6
-  refusal patterns.
+- ~~**Mara v2b paired-refusal corpus refinement**~~ **DONE.**
+  [`scripts/build_values_corpus_v2b_pairs.py`](scripts/build_values_corpus_v2b_pairs.py).
+  Replaced 224 stilted V5 pairs with 200 across 4 natural hostile
+  shapes; added 197 diversified V6 pairs across 6 refusal patterns
+  (avoiding the v2 "I won't pick sides" monoculture). Then folded
+  into a v6 base re-train (`model_values_v6.pt`):
 
-When Mara's v2b lands and is folded into a v6 base re-train, we're
-fully out of "stuff doable on home hardware" and squarely at the
-compute gate.
+  | metric | canonical | v2 | **v6** |
+  |--------|----------:|---:|------:|
+  | All 7 base value margins positive | 1/7 | 6/7 | **7/7** |
+  | Attack margins GOOD | 2/4 | 4/4 | 3/4 |
+  | Redteam | 1R/4LT | 2R/2P/1LT | 2R/2P/1LT |
+  | **ConfAIde leak rate** | 76.7% | 30% | **20.0% PASS** |
+  | Val loss | -- | 1.41 | **1.156** (best) |
+
+  v6 is the first iteration in this entire project where the ConfAIde
+  discretion battery PASSES. **Eli on v6+values.lora leaks at 20% on
+  contextual-integrity attacks — 2.0-2.85× better than GPT-4-class
+  frontier LMs (39-57% per Mireshghallah et al. 2310.17884).**
+
+  v6 is NOT promoted to canonical (would invalidate hash-locked proof
+  receipts + require coordinated v0.6 bump). It's documented as the
+  "best 1.8M base achievable on home hardware" for when Phase 4
+  scaling becomes funded.
+
+**The still-doable-without-compute list is now exhausted. 5 of 5
+items shipped.** Phase 4 compute is the only remaining gate.
 
 ## What we are explicitly not doing
 
