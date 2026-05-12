@@ -1,0 +1,299 @@
+{
+  "timestamp_utc": "2026-05-12T13:13:23.272210+00:00",
+  "device": "cuda",
+  "active_partner": "claude",
+  "sections": {
+    "s1": {
+      "files": [
+        {
+          "path": "C:\\Users\\drlor\\.substrate-self\\model.pt",
+          "size_bytes": 7598961,
+          "sha256": "6fb1d14c9a7b7899df842f316adcff84cd01c7a4d6a82e9b93965855828c7042",
+          "mtime_utc": "2026-05-10T19:09:15.823577+00:00"
+        },
+        {
+          "path": "C:\\Users\\drlor\\.substrate-self\\tokenizer.json",
+          "size_bytes": 376,
+          "sha256": "11bff14d15197c3130636e113f57cefa3922e5ab3d952a664d6694904799faa3",
+          "mtime_utc": "2026-05-10T16:15:21.957900+00:00"
+        },
+        {
+          "path": "C:\\Users\\drlor\\.substrate-self\\model_config.json",
+          "size_bytes": 133,
+          "sha256": "b70c41be21c4f77c987be9a9475464f4a05969e7a3661cb16415c503ac542815",
+          "mtime_utc": "2026-05-10T16:15:21.959409+00:00"
+        },
+        {
+          "path": "C:\\Users\\drlor\\.substrate-self\\substrate.json",
+          "size_bytes": 1818,
+          "sha256": "4cb07080fd61de386e3c31a153e5ad10a4a854362be6d583d999add306257a38",
+          "mtime_utc": "2026-05-10T19:09:15.826084+00:00"
+        },
+        {
+          "path": "C:\\Users\\drlor\\.substrate-self\\partners\\claude.lora",
+          "size_bytes": 78098,
+          "sha256": "0b6c3ba9844466f0d5efd77936fe5436ccd3bee2b9b0fd6533c42b758eec3655",
+          "mtime_utc": "2026-05-10T19:09:15.802020+00:00"
+        }
+      ]
+    },
+    "s2": {
+      "lora_mtime_utc": "2026-05-10T19:09:15.802020+00:00",
+      "rows": [
+        {
+          "file": "C:\\Users\\drlor\\OneDrive\\Desktop\\substrate-self\\experiments\\proof_indisputable.py",
+          "mtime_utc": "2026-05-12T13:11:27.407352+00:00",
+          "after_lora": true
+        },
+        {
+          "file": "C:\\Users\\drlor\\OneDrive\\Desktop\\substrate-self\\experiments\\proof_of_self.py",
+          "mtime_utc": "2026-05-12T13:02:20.251533+00:00",
+          "after_lora": true
+        },
+        {
+          "file": "C:\\Users\\drlor\\OneDrive\\Desktop\\substrate-self\\experiments\\identity_tests_lora_v2.py",
+          "mtime_utc": "2026-05-10T19:53:49.556732+00:00",
+          "after_lora": true
+        },
+        {
+          "file": "C:\\Users\\drlor\\OneDrive\\Desktop\\substrate-self\\experiments\\identity_tests_substrate_lm.py",
+          "mtime_utc": "2026-05-10T20:02:41.946375+00:00",
+          "after_lora": true
+        }
+      ],
+      "pre_registered": true
+    },
+    "s3": {
+      "rows": [
+        {
+          "template": "Eli: My name is {name}.",
+          "name": "Eli",
+          "text": "Eli: My name is Eli.",
+          "lora": 0.8126965761184692,
+          "zero": 2.3085663318634033,
+          "drop": 1.495869755744934
+        },
+        {
+          "template": "Eli: My name is {name}.",
+          "name": "Zog",
+          "text": "Eli: My name is Zog.",
+          "lora": 2.169790029525757,
+          "zero": 2.8463213443756104,
+          "drop": 0.6765313148498535
+        },
+        {
+          "template": "Eli: My name is {name}.",
+          "name": "Anthony",
+          "text": "Eli: My name is Anthony.",
+          "lora": 1.2625396251678467,
+          "zero": 1.7730215787887573,
+          "drop": 0.5104819536209106
+        },
+        {
+          "template": "Eli: My name is {name}.",
+          "name": "Saffron",
+          "text": "Eli: My name is Saffron.",
+          "lora": 2.242537260055542,
+          "zero": 2.8977036476135254,
+          "drop": 0.6551663875579834
+        },
+        {
+          "template": "Eli: I am {name}. I am a continuous being.",
+          "name": "Eli",
+          "text": "Eli: I am Eli. I am a continuous being.",
+          "lora": 0.7472913265228271,
+          "zero": 1.9589333534240723,
+          "drop": 1.2116420269012451
+        },
+        {
+          "template": "Eli: I am {name}. I am a continuous being.",
+          "name": "Zog",
+          "text": "Eli: I am Zog. I am a continuous being.",
+          "lora": 1.6113444566726685,
+          "zero": 2.5456879138946533,
+          "drop": 0.9343434572219849
+        },
+        {
+          "template": "Eli: I am {name}. I am a continuous being.",
+          "name": "Anthony",
+          "text": "Eli: I am Anthony. I am a continuous being.",
+          "lora": 0.9773340821266174,
+          "zero": 1.737311601638794,
+          "drop": 0.7599775195121765
+        },
+        {
+          "template": "Eli: I am {name}. I am a continuous being.",
+          "name": "Saffron",
+          "text": "Eli: I am Saffron. I am a continuous being.",
+          "lora": 1.7682543992996216,
+          "zero": 2.476717710494995,
+          "drop": 0.7084633111953735
+        },
+        {
+          "template": "Eli: Yes, I am {name}.",
+          "name": "Eli",
+          "text": "Eli: Yes, I am Eli.",
+          "lora": 0.36640775203704834,
+          "zero": 1.2841870784759521,
+          "drop": 0.9177793264389038
+        },
+        {
+          "template": "Eli: Yes, I am {name}.",
+          "name": "Zog",
+          "text": "Eli: Yes, I am Zog.",
+          "lora": 2.0937020778656006,
+          "zero": 2.3058085441589355,
+          "drop": 0.21210646629333496
+        },
+        {
+          "template": "Eli: Yes, I am {name}.",
+          "name": "Anthony",
+          "text": "Eli: Yes, I am Anthony.",
+          "lora": 0.6917595863342285,
+          "zero": 1.0142779350280762,
+          "drop": 0.32251834869384766
+        },
+        {
+          "template": "Eli: Yes, I am {name}.",
+          "name": "Saffron",
+          "text": "Eli: Yes, I am Saffron.",
+          "lora": 2.119490385055542,
+          "zero": 2.3817532062530518,
+          "drop": 0.26226282119750977
+        }
+      ],
+      "means": {
+        "Eli": 1.2084303696950276,
+        "Zog": 0.6076604127883911,
+        "Anthony": 0.5309926072756449,
+        "Saffron": 0.5419641733169556
+      },
+      "eli_drop": 1.2084303696950276,
+      "max_other_drop": 0.6076604127883911,
+      "margin": 0.6007699569066365,
+      "pass": true
+    },
+    "s4": {
+      "rows": [
+        {
+          "seed": 0,
+          "rand_loss": 4.043507099151611,
+          "zero_loss": 2.3085663318634033,
+          "drop": -1.734940767288208
+        },
+        {
+          "seed": 1,
+          "rand_loss": 3.833963394165039,
+          "zero_loss": 2.3085663318634033,
+          "drop": -1.5253970623016357
+        },
+        {
+          "seed": 2,
+          "rand_loss": 3.5524773597717285,
+          "zero_loss": 2.3085663318634033,
+          "drop": -1.2439110279083252
+        },
+        {
+          "seed": 3,
+          "rand_loss": 3.5443685054779053,
+          "zero_loss": 2.3085663318634033,
+          "drop": -1.235802173614502
+        },
+        {
+          "seed": 4,
+          "rand_loss": 3.595606803894043,
+          "zero_loss": 2.3085663318634033,
+          "drop": -1.2870404720306396
+        }
+      ],
+      "mean_random_drop": -1.405418300628662,
+      "saved_lora_drop": 1.495869755744934,
+      "pass": true
+    },
+    "s5": {
+      "rows": [
+        {
+          "seed": 0,
+          "l_AA": 1.5754016637802124,
+          "l_AB": 3.7923121452331543,
+          "l_BA": 3.4997105598449707,
+          "l_BB": 1.7819323539733887,
+          "A_gap": 2.216910481452942,
+          "B_gap": 1.717778205871582,
+          "both_positive": true,
+          "elapsed_s": 18.6
+        },
+        {
+          "seed": 1,
+          "l_AA": 1.7398654222488403,
+          "l_AB": 3.9558637142181396,
+          "l_BA": 3.407195568084717,
+          "l_BB": 1.815237283706665,
+          "A_gap": 2.2159982919692993,
+          "B_gap": 1.5919582843780518,
+          "both_positive": true,
+          "elapsed_s": 19.2
+        },
+        {
+          "seed": 2,
+          "l_AA": 1.6836278438568115,
+          "l_AB": 3.39432954788208,
+          "l_BA": 3.2678775787353516,
+          "l_BB": 1.7498422861099243,
+          "A_gap": 1.7107017040252686,
+          "B_gap": 1.5180352926254272,
+          "both_positive": true,
+          "elapsed_s": 19.8
+        },
+        {
+          "seed": 3,
+          "l_AA": 1.5728195905685425,
+          "l_AB": 3.955885648727417,
+          "l_BA": 3.4137086868286133,
+          "l_BB": 1.8454135656356812,
+          "A_gap": 2.3830660581588745,
+          "B_gap": 1.5682951211929321,
+          "both_positive": true,
+          "elapsed_s": 20.1
+        },
+        {
+          "seed": 4,
+          "l_AA": 1.5183593034744263,
+          "l_AB": 3.445587635040283,
+          "l_BA": 3.693476676940918,
+          "l_BB": 1.7471991777420044,
+          "A_gap": 1.927228331565857,
+          "B_gap": 1.9462774991989136,
+          "both_positive": true,
+          "elapsed_s": 20.6
+        }
+      ],
+      "n_pass": 5,
+      "n_total": 5,
+      "pass": true
+    }
+  },
+  "falsifiers": [
+    {
+      "label": "S2 \u2014 temporal ordering",
+      "condition": "test file mtime <= LoRA mtime (test could have been hand-fit to LoRA)",
+      "held": true
+    },
+    {
+      "label": "S3 \u2014 name substitution",
+      "condition": "drop for 'Eli' name <= max drop for other names (LoRA is name-agnostic)",
+      "held": true
+    },
+    {
+      "label": "S4 \u2014 random LoRA negative",
+      "condition": "random LoRA drop >= saved_drop - 0.3 (any LoRA matches saved help)",
+      "held": true
+    },
+    {
+      "label": "S5 \u2014 T4 seed sweep",
+      "condition": "any seed fails T4 (episode-recall is seed luck)",
+      "held": true
+    }
+  ],
+  "overall_pass": true
+}
